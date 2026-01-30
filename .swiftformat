@@ -1,0 +1,12 @@
+# SwiftFormat configuration
+# Note: Using widely adopted, conservative defaults aligned with common Swift style.
+
+--swiftversion 5.0
+--indent 4
+--linebreaks lf
+--commas inline
+--trimwhitespace always
+--wraparguments before-first
+--wrapparameters before-first
+--funcattributes prev-line
+--typeattributes prev-line
