@@ -13,6 +13,18 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" contentMode="scaleAspectFill" translatesAutoresizingMaskIntoConstraints="NO" id="sV0-0k-2b1">
+                                <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                                <image name="LaunchImage"/>
+                            </imageView>
+                        </subviews>
+                        <constraints>
+                            <constraint firstItem="sV0-0k-2b1" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="1Wl-8g-7u1"/>
+                            <constraint firstItem="sV0-0k-2b1" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="5d8-4g-h3b"/>
+                            <constraint firstItem="sV0-0k-2b1" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="B4x-vw-3P0"/>
+                            <constraint firstItem="sV0-0k-2b1" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="s7C-0c-5Dk"/>
+                        </constraints>
                         <color key="backgroundColor" xcode11CocoaTouchSystemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
@@ -22,4 +34,7 @@
             <point key="canvasLocation" x="53" y="375"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="LaunchImage" width="1024" height="1024"/>
+    </resources>
 </document>
