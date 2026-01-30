@@ -47,8 +47,8 @@ Tester OneUITests/
 ## Notes
 - `SceneDelegate` is intentionally removed to keep iOS 12 compatibility.
 - The main window is created via `AppDelegate`, and the UI is loaded from `Main.storyboard`.
-- Launch image: **"2010-kodiak-bear-1"** by Yathin S Krishnappa (CC BY-SA 3.0).
-  https://commons.wikimedia.org/wiki/File:2010-kodiak-bear-1.jpg
+- Launch image: **"Tuscan Landscape 6"** by Martin Falbisoner (CC BY-SA 3.0).
+  https://commons.wikimedia.org/wiki/File:Tuscan_Landscape_6.JPG
 
 ## License
 MIT
