@@ -11,11 +11,7 @@ import UIKit
 
 final class MainViewController: UIViewController {
 
-  // MARK: Properties
-
-  private let contentView = MainView()
-
-  // MARK: Functions
+  // MARK: Internal
 
   override func loadView() {
     view = contentView
@@ -40,6 +36,10 @@ final class MainViewController: UIViewController {
     super.viewWillDisappear(animated)
     navigationController?.setNavigationBarHidden(false, animated: false)
   }
+
+  // MARK: Private
+
+  private let contentView = MainView()
 
   private func configureActions() {
     contentView.startButton.addTarget(self, action: #selector(startTapped), for: .touchUpInside)
@@ -79,7 +79,7 @@ final class MainViewController: UIViewController {
   private func startTapped() {
     contentView.animatePrimaryButtonTap()
 
-    let viewController = DeviceTestAlphaViewController()
+    let viewController = DeviceTestViewController()
     navigationController?.pushViewController(viewController, animated: true)
   }
 }
@@ -88,26 +88,7 @@ final class MainViewController: UIViewController {
 
 final class MainView: UIView {
 
-  // MARK: Nested Types
-
-  private enum Layout {
-    static let horizontalInset: CGFloat = 24
-    static let contentTopInset: CGFloat = 40
-    static let contentBottomInset: CGFloat = 32
-    static let heroMaxWidth: CGFloat = 280
-    static let heroMinWidth: CGFloat = 200
-    static let heroAspectRatio: CGFloat = 0.78
-    static let buttonHeight: CGFloat = 44
-    static let buttonCornerRadius: CGFloat = 18
-  }
-
-  private enum Animation {
-    static let short: TimeInterval = 0.12
-    static let medium: TimeInterval = 0.22
-    static let long: TimeInterval = 0.5
-  }
-
-  // MARK: Properties
+  // MARK: Internal
 
   let startButton: UIButton = {
     let button = UIButton(type: .system)
@@ -119,62 +100,6 @@ final class MainView: UIView {
     button.translatesAutoresizingMaskIntoConstraints = false
     return button
   }()
-
-  private let heroImageView: UIImageView = {
-    let imageView = UIImageView()
-    imageView.contentMode = .scaleAspectFit
-    imageView.translatesAutoresizingMaskIntoConstraints = false
-    return imageView
-  }()
-
-  private let headlineLabel: UILabel = {
-    let label = UILabel()
-    label.text = "Get Started on"
-    label.font = .systemFont(ofSize: 14, weight: .medium)
-    label.textAlignment = .center
-    return label
-  }()
-
-  private let brandLabel: UILabel = {
-    let label = UILabel()
-    label.text = "MoneyMate"
-    label.font = .systemFont(ofSize: 28, weight: .semibold)
-    label.textAlignment = .center
-    return label
-  }()
-
-  private let subtitleLabel: UILabel = {
-    let label = UILabel()
-    label.text = "Organizing Finance, Creating Balance — Plan Your Financial Future Wisely"
-    label.font = .systemFont(ofSize: 12, weight: .regular)
-    label.numberOfLines = 0
-    label.textAlignment = .center
-    return label
-  }()
-
-  private lazy var textStack: UIStackView = {
-    let stack = UIStackView(arrangedSubviews: [headlineLabel, brandLabel, subtitleLabel])
-    stack.axis = .vertical
-    stack.alignment = .center
-    stack.spacing = 6
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    return stack
-  }()
-
-  private lazy var contentStack: UIStackView = {
-    let stack = UIStackView(arrangedSubviews: [heroImageView, textStack, startButton])
-    stack.axis = .vertical
-    stack.alignment = .center
-    stack.spacing = 20
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    return stack
-  }()
-
-  private var hasAnimatedIn = false
-  private var primaryColor = UIColor.systemGreen
-  private var buttonTextColor = UIColor.black
-
-  // MARK: Lifecycle
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -192,11 +117,9 @@ final class MainView: UIView {
   }
 
   @available(*, unavailable)
-  required init?(coder: NSCoder) {
+  required init?(coder _: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
-
-  // MARK: Functions
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
     super.traitCollectionDidChange(previousTraitCollection)
@@ -253,6 +176,79 @@ final class MainView: UIView {
       },
     )
   }
+
+  // MARK: Private
+
+  private enum Layout {
+    static let horizontalInset: CGFloat = 24
+    static let contentTopInset: CGFloat = 40
+    static let contentBottomInset: CGFloat = 32
+    static let heroMaxWidth: CGFloat = 280
+    static let heroMinWidth: CGFloat = 200
+    static let heroAspectRatio: CGFloat = 0.78
+    static let buttonHeight: CGFloat = 44
+    static let buttonCornerRadius: CGFloat = 18
+  }
+
+  private enum Animation {
+    static let short: TimeInterval = 0.12
+    static let medium: TimeInterval = 0.22
+    static let long: TimeInterval = 0.5
+  }
+
+  private let heroImageView: UIImageView = {
+    let imageView = UIImageView()
+    imageView.contentMode = .scaleAspectFit
+    imageView.translatesAutoresizingMaskIntoConstraints = false
+    return imageView
+  }()
+
+  private let headlineLabel: UILabel = {
+    let label = UILabel()
+    label.text = "Get Started on"
+    label.font = .systemFont(ofSize: 14, weight: .medium)
+    label.textAlignment = .center
+    return label
+  }()
+
+  private let brandLabel: UILabel = {
+    let label = UILabel()
+    label.text = "MoneyMate"
+    label.font = .systemFont(ofSize: 28, weight: .semibold)
+    label.textAlignment = .center
+    return label
+  }()
+
+  private let subtitleLabel: UILabel = {
+    let label = UILabel()
+    label.text = "Organizing Finance, Creating Balance — Plan Your Financial Future Wisely"
+    label.font = .systemFont(ofSize: 12, weight: .regular)
+    label.numberOfLines = 0
+    label.textAlignment = .center
+    return label
+  }()
+
+  private lazy var textStack: UIStackView = {
+    let stack = UIStackView(arrangedSubviews: [headlineLabel, brandLabel, subtitleLabel])
+    stack.axis = .vertical
+    stack.alignment = .center
+    stack.spacing = 6
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    return stack
+  }()
+
+  private lazy var contentStack: UIStackView = {
+    let stack = UIStackView(arrangedSubviews: [heroImageView, textStack, startButton])
+    stack.axis = .vertical
+    stack.alignment = .center
+    stack.spacing = 20
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    return stack
+  }()
+
+  private var hasAnimatedIn = false
+  private var primaryColor = UIColor.systemGreen
+  private var buttonTextColor = UIColor.black
 
   private func setupViewHierarchy() {
     addSubview(contentStack)

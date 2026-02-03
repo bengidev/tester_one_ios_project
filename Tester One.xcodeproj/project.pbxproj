@@ -112,6 +112,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = ECF1AA362F2C470F00E551E5 /* Build configuration list for PBXNativeTarget "Tester One" */;
 			buildPhases = (
+				DE07B41FC45CD51708F3A256 /* SwiftFormat */,
 				ECF1AA062F2C470C00E551E5 /* Sources */,
 				ECF1AA072F2C470C00E551E5 /* Frameworks */,
 				ECF1AA082F2C470C00E551E5 /* Resources */,
@@ -243,6 +244,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		DE07B41FC45CD51708F3A256 /* SwiftFormat */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)",
+				"$(SRCROOT)/.swiftformat",
+			);
+			name = SwiftFormat;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/swiftformat.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\nif command -v swiftformat >/dev/null 2>&1; then\n  echo \"note: SwiftFormat running...\"\n  swiftformat --config \"${SRCROOT}/.swiftformat\" \"${SRCROOT}\"\n  echo \"note: SwiftFormat completed successfully.\"\nelse\n  echo \"warning: SwiftFormat not installed; skipping. Install with: brew install swiftformat\"\nfi\n\ntouch \"${DERIVED_FILE_DIR}/swiftformat.stamp\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		ECF1AA062F2C470C00E551E5 /* Sources */ = {
@@ -388,7 +413,7 @@
 				DEVELOPMENT_TEAM = 2N64875GLV;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -452,7 +477,7 @@
 				DEVELOPMENT_TEAM = 2N64875GLV;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
