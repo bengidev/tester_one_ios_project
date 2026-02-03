@@ -9,56 +9,50 @@ import UIKit
 
 // MARK: - DeviceTestViewController
 
+/// View controller displaying a list of device diagnostic tests.
 final class DeviceTestViewController: UIViewController {
 
-  // MARK: Internal
+  // MARK: - Types
 
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    configureView()
-    setupViewHierarchy()
-    setupConstraints()
-    configureTableView()
-    configureActionButton()
-    configureNavigationTitle()
+  private enum TestStatus {
+    case enabled
+    case disabled
+
+    var title: String {
+      switch self {
+      case .enabled: return "Mulai Tes"
+      case .disabled: return "Dalam Pengecekan"
+      }
+    }
+
+    var backgroundColor: UIColor {
+      switch self {
+      case .enabled:
+        return UIColor(red: 51.0 / 255.0, green: 185.0 / 255.0, blue: 255.0 / 255.0, alpha: 1)
+      case .disabled:
+        return UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1)
+      }
+    }
+
+    var textColor: UIColor {
+      switch self {
+      case .enabled: return .white
+      case .disabled:
+        return UIColor(red: 154.0 / 255.0, green: 160.0 / 255.0, blue: 163.0 / 255.0, alpha: 1)
+      }
+    }
   }
 
-  override func viewWillAppear(_ animated: Bool) {
-    super.viewWillAppear(animated)
-    navigationController?.setNavigationBarHidden(false, animated: animated)
-  }
-
-  override func viewDidAppear(_ animated: Bool) {
-    super.viewDidAppear(animated)
-  }
-
-  override func viewDidLayoutSubviews() {
-    super.viewDidLayoutSubviews()
-    updateTableSpacerViews()
-  }
-
-  override func viewWillDisappear(_ animated: Bool) {
-    super.viewWillDisappear(animated)
-  }
-
-  override func viewDidDisappear(_ animated: Bool) {
-    super.viewDidDisappear(animated)
-  }
-
-  // MARK: Private
+  // MARK: - Constants
 
   private enum Constants {
     static let navigationTitle = "Cek Fungsi Software"
-    static let navigationTitleColor = UIColor(red: 0, green: 102.0 / 255.0, blue: 200.0 / 255.0, alpha: 1)
-    static let tableBackgroundColor = UIColor(red: 232.0 / 255.0, green: 238.0 / 255.0, blue: 241.0 / 255.0, alpha: 1)
-    static let cellReuseIdentifier = "DeviceTestCell"
+    static let cellReuseIdentifier = "AlphaTestCell"
     static let estimatedRowHeight: CGFloat = 64
     static let tableContentInset = UIEdgeInsets(top: 20, left: 0, bottom: 20, right: 0)
-    static let actionEnabledTitle = "Mulai Tes"
-    static let actionDisabledTitle = "Dalam Pengecekan"
-    static let actionEnabledColor = UIColor(red: 51.0 / 255.0, green: 185.0 / 255.0, blue: 255.0 / 255.0, alpha: 1)
-    static let actionDisabledColor = UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1)
-    static let actionDisabledTextColor = UIColor(red: 154.0 / 255.0, green: 160.0 / 255.0, blue: 163.0 / 255.0, alpha: 1)
+
+    static let navigationTitleColor = UIColor(red: 0, green: 102.0 / 255.0, blue: 200.0 / 255.0, alpha: 1)
+    static let tableBackgroundColor = UIColor(red: 232.0 / 255.0, green: 238.0 / 255.0, blue: 241.0 / 255.0, alpha: 1)
   }
 
   private enum Layout {
@@ -68,27 +62,54 @@ final class DeviceTestViewController: UIViewController {
     static let actionButtonCornerRadius: CGFloat = 10
   }
 
-  private let fullScreenView: UIView = {
+  // MARK: - Properties
+
+  private let testItems: [String] = [
+    "Battery Health",
+    "Camera Check",
+    "Speaker Test",
+    "Microphone Test",
+    "Display Brightness",
+    "Touchscreen ResponsivenessTouchscreen Responsiveness",
+    "Wi-Fi Connection",
+    "Bluetooth Pairing",
+    "Charging Port",
+    "Vibration Motor",
+    "Face ID / Touch ID",
+    "GPS Signal",
+    "Proximity Sensor",
+    "Ambient Light SensorAmbient Light SensorAmbient Light SensorAmbient Light Sensor",
+  ]
+
+  private var currentStatus: TestStatus = .disabled
+
+  // MARK: - UI Components
+
+  private lazy var fullScreenView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
     return view
   }()
 
-  private let tableView: UITableView = {
+  private lazy var tableView: UITableView = {
     let tableView = UITableView(frame: .zero, style: .plain)
     tableView.translatesAutoresizingMaskIntoConstraints = false
     tableView.separatorStyle = .none
+    tableView.backgroundColor = Constants.tableBackgroundColor
+    tableView.rowHeight = UITableView.automaticDimension
+    tableView.estimatedRowHeight = Constants.estimatedRowHeight
+    tableView.delaysContentTouches = false
     return tableView
   }()
 
-  private let actionContainerView: UIView = {
+  private lazy var actionContainerView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
     view.backgroundColor = .clear
     return view
   }()
 
-  private let actionButton: UIButton = {
+  private lazy var actionButton: UIButton = {
     let button = UIButton(type: .system)
     button.translatesAutoresizingMaskIntoConstraints = false
     button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
@@ -97,31 +118,49 @@ final class DeviceTestViewController: UIViewController {
     return button
   }()
 
-  private let items = [
-    "Battery Health — Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor.",
-    "Camera Check — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-    "Speaker Test — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
-    "Microphone Test — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.",
-    "Display Brightness — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.",
-    "Touchscreen Responsiveness — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.",
-    "Wi-Fi Connection — Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-    "Bluetooth Pairing — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.",
-    "Charging Port — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
-    "Vibration Motor — Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-    "Face ID / Touch ID — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.",
-    "GPS Signal — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-    "Proximity Sensor — Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-    "Ambient Light Sensor — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.",
-  ]
+  // MARK: - Lifecycle
 
-  private var isActionEnabled = false {
-    didSet {
-      updateActionButtonAppearance()
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    setupViewController()
+  }
+
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    navigationController?.setNavigationBarHidden(false, animated: animated)
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    updateTableSpacerViews()
+  }
+
+  // MARK: - Setup
+
+  private func setupViewController() {
+    setupAppearance()
+    setupNavigationBar()
+    setupViewHierarchy()
+    setupConstraints()
+    setupTableView()
+    setupActionButton()
+  }
+
+  private func setupAppearance() {
+    if #available(iOS 13.0, *) {
+      view.backgroundColor = .systemBackground
+      fullScreenView.backgroundColor = .systemBackground
+    } else {
+      view.backgroundColor = .white
+      fullScreenView.backgroundColor = .white
     }
   }
 
-  private func configureView() {
-    applyColors()
+  private func setupNavigationBar() {
+    title = Constants.navigationTitle
+    navigationController?.navigationBar.titleTextAttributes = [
+      .foregroundColor: Constants.navigationTitleColor,
+    ]
   }
 
   private func setupViewHierarchy() {
@@ -133,48 +172,40 @@ final class DeviceTestViewController: UIViewController {
 
   private func setupConstraints() {
     NSLayoutConstraint.activate([
+      // Full screen view
       fullScreenView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       fullScreenView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       fullScreenView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
       fullScreenView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
+      // Table view
       tableView.leadingAnchor.constraint(equalTo: fullScreenView.leadingAnchor),
       tableView.trailingAnchor.constraint(equalTo: fullScreenView.trailingAnchor),
       tableView.topAnchor.constraint(equalTo: fullScreenView.topAnchor),
       tableView.bottomAnchor.constraint(equalTo: actionContainerView.topAnchor),
 
+      // Action container
       actionContainerView.leadingAnchor.constraint(equalTo: fullScreenView.leadingAnchor),
       actionContainerView.trailingAnchor.constraint(equalTo: fullScreenView.trailingAnchor),
       actionContainerView.bottomAnchor.constraint(equalTo: fullScreenView.safeAreaLayoutGuide.bottomAnchor),
 
+      // Action button
       actionButton.leadingAnchor.constraint(equalTo: actionContainerView.leadingAnchor, constant: Layout.actionHorizontalInset),
-      actionButton.trailingAnchor.constraint(
-        equalTo: actionContainerView.trailingAnchor,
-        constant: -Layout.actionHorizontalInset,
-      ),
+      actionButton.trailingAnchor.constraint(equalTo: actionContainerView.trailingAnchor, constant: -Layout.actionHorizontalInset),
       actionButton.topAnchor.constraint(equalTo: actionContainerView.topAnchor, constant: Layout.actionVerticalInset),
       actionButton.bottomAnchor.constraint(equalTo: actionContainerView.bottomAnchor, constant: -Layout.actionVerticalInset),
       actionButton.heightAnchor.constraint(equalToConstant: Layout.actionButtonHeight),
     ])
   }
 
-  private func configureNavigationTitle() {
-    let titleLabel = UILabel()
-    titleLabel.text = Constants.navigationTitle
-    titleLabel.textColor = Constants.navigationTitleColor
-    titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-    navigationItem.titleView = titleLabel
-  }
-
-  private func configureTableView() {
+  private func setupTableView() {
     tableView.dataSource = self
     tableView.delegate = self
-    tableView.register(DeviceTestTableViewCell.self, forCellReuseIdentifier: Constants.cellReuseIdentifier)
-    tableView.tableHeaderView = makeTableSpacerView(height: Constants.tableContentInset.top)
-    tableView.tableFooterView = makeTableSpacerView(height: Constants.tableContentInset.bottom)
-    tableView.backgroundColor = Constants.tableBackgroundColor
-    tableView.rowHeight = UITableView.automaticDimension
-    tableView.estimatedRowHeight = Constants.estimatedRowHeight
+    tableView.register(AlphaTestTableViewCell.self, forCellReuseIdentifier: Constants.cellReuseIdentifier)
+
+    tableView.tableHeaderView = createSpacerView(height: Constants.tableContentInset.top)
+    tableView.tableFooterView = createSpacerView(height: Constants.tableContentInset.bottom)
+
     if #available(iOS 11.0, *) {
       tableView.contentInsetAdjustmentBehavior = .never
     } else {
@@ -182,24 +213,27 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  private func configureActionButton() {
+  private func setupActionButton() {
     actionButton.addTarget(self, action: #selector(actionButtonTapped), for: .touchUpInside)
-    updateActionButtonAppearance()
+    updateActionButton()
   }
 
-  private func updateActionButtonAppearance() {
-    if isActionEnabled {
-      actionButton.setTitle(Constants.actionEnabledTitle, for: .normal)
-      actionButton.backgroundColor = Constants.actionEnabledColor
-      actionButton.setTitleColor(.white, for: .normal)
-    } else {
-      actionButton.setTitle(Constants.actionDisabledTitle, for: .normal)
-      actionButton.backgroundColor = Constants.actionDisabledColor
-      actionButton.setTitleColor(Constants.actionDisabledTextColor, for: .normal)
-    }
+  // MARK: - Actions
+
+  @objc private func actionButtonTapped() {
+    currentStatus = (currentStatus == .enabled) ? .disabled : .enabled
+    updateActionButton()
   }
 
-  private func makeTableSpacerView(height: CGFloat) -> UIView {
+  // MARK: - Private Methods
+
+  private func updateActionButton() {
+    actionButton.setTitle(currentStatus.title, for: .normal)
+    actionButton.backgroundColor = currentStatus.backgroundColor
+    actionButton.setTitleColor(currentStatus.textColor, for: .normal)
+  }
+
+  private func createSpacerView(height: CGFloat) -> UIView {
     UIView(frame: CGRect(x: 0, y: 0, width: 1, height: height))
   }
 
@@ -219,44 +253,49 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  @objc
-  private func actionButtonTapped() {
-    isActionEnabled.toggle()
+  // MARK: - Cell Configuration
+
+  private func configureCell(_ cell: AlphaTestTableViewCell, at indexPath: IndexPath) {
+    let title = testItems[indexPath.row]
+    let status = statusForRow(at: indexPath)
+    cell.configure(title: title, status: status)
   }
 
-  private func applyColors() {
-    if #available(iOS 13.0, *) {
-      view.backgroundColor = .systemBackground
-      fullScreenView.backgroundColor = .systemBackground
-    } else {
-      view.backgroundColor = .white
-      fullScreenView.backgroundColor = .white
+  private func statusForRow(at indexPath: IndexPath) -> AlphaTestTableViewCell.Status {
+    // Alternate status for demonstration: every 3rd row shows failure
+    switch indexPath.row % 3 {
+    case 0: return .failure
+    case 1: return .success
+    default: return .pending
     }
   }
 }
 
-// MARK: UITableViewDataSource, UITableViewDelegate
+// MARK: - UITableViewDataSource
 
-extension DeviceTestViewController: UITableViewDataSource, UITableViewDelegate {
+extension DeviceTestViewController: UITableViewDataSource {
 
   func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int {
-    items.count
+    return testItems.count
   }
 
-  func tableView(
-    _ tableView: UITableView,
-    cellForRowAt indexPath: IndexPath,
-  ) -> UITableViewCell {
+  func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
     let cell = tableView.dequeueReusableCell(
       withIdentifier: Constants.cellReuseIdentifier,
-      for: indexPath,
+      for: indexPath
     )
 
-    if let deviceCell = cell as? DeviceTestTableViewCell {
-      deviceCell.configure(title: items[indexPath.row])
+    if let testCell = cell as? AlphaTestTableViewCell {
+      configureCell(testCell, at: indexPath)
     }
 
     cell.backgroundColor = Constants.tableBackgroundColor
     return cell
   }
+}
+
+// MARK: - UITableViewDelegate
+
+extension DeviceTestViewController: UITableViewDelegate {
+  // Add delegate methods here if needed (e.g., didSelectRowAt)
 }
