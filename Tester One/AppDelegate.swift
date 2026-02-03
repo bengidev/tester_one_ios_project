@@ -11,8 +11,6 @@ import UIKit
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
 
-  // MARK: Properties
-
   var window: UIWindow?
 
   lazy var persistentContainer: NSPersistentContainer = {
@@ -37,8 +35,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     })
     return container
   }()
-
-  // MARK: Functions
 
   func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
     window = UIWindow(frame: UIScreen.main.bounds)

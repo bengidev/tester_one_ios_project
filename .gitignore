@@ -3,6 +3,7 @@
 
 # Xcode
 DerivedData/
+.derivedData/
 build/
 *.xcuserstate
 *.xccheckout
@@ -11,6 +12,7 @@ build/
 # Xcode user settings
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
+*.xcodeproj/xcshareddata/
 
 # Design assets
 Tester One/Image Concepts/
