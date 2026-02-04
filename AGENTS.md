@@ -216,6 +216,43 @@ On iOS 17+, the automatic app launch may fail with "Launch command failed, pleas
 3. **Trust the developer** - Go to Settings → VPN & Device Management → Trust
 4. **Use ios-deploy** - Install with `brew install ios-deploy` for better launch support
 
+---
+
+## Auto Layout Constraint Debugging
+
+The project has strict Auto Layout constraint checking enabled:
+
+### Build Settings (Compile-time)
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `SWIFT_TREAT_WARNINGS_AS_ERRORS` | `YES` | Swift warnings fail the build |
+| `GCC_TREAT_WARNINGS_AS_ERRORS` | `YES` | Clang warnings fail the build |
+
+### AutoLayoutDebugger (Runtime)
+
+A runtime debugger is included that **crashes the app in DEBUG builds** when Auto Layout constraint violations occur.
+
+**File:** `Tester One/AutoLayoutDebugger.swift`
+
+**Behavior:**
+- In DEBUG builds: Constraint conflicts trigger a `fatalError()` with detailed error message
+- In RELEASE builds: Debugger is inactive (no performance impact)
+
+**Example crash output:**
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    AUTO LAYOUT CONSTRAINT VIOLATION                          ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+
+❌ Build failed due to Auto Layout constraint conflict!
+
+Constraint: <NSLayoutConstraint:0x... ...>
+Conflicts with: <NSLayoutConstraint:0x... ...>
+```
+
+**To disable:** Remove `AutoLayoutDebugger.activate()` from `AppDelegate.swift`
+
 ### `run-tests.sh` - Run Unit Tests
 
 Executes the unit test suite on iOS Simulator.
