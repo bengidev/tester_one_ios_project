@@ -8,9 +8,14 @@
 import XCTest
 
 final class Tester_OneUITestsLaunchTests: XCTestCase {
+
+  // MARK: Class Properties
+
   override class var runsForEachTargetApplicationUIConfiguration: Bool {
     true
   }
+
+  // MARK: Functions
 
   override func setUpWithError() throws {
     continueAfterFailure = false

@@ -12,38 +12,55 @@ import UIKit
 /// View controller displaying a list of device diagnostic tests.
 final class DeviceTestViewController: UIViewController {
 
-  // MARK: - Types
+  // MARK: Internal
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    setupViewController()
+  }
+
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    navigationController?.setNavigationBarHidden(false, animated: animated)
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    updateTableSpacerViews()
+  }
+
+  // MARK: Private
 
   private enum TestStatus {
     case enabled
     case disabled
 
+    // MARK: Internal
+
     var title: String {
       switch self {
-      case .enabled: return "Mulai Tes"
-      case .disabled: return "Dalam Pengecekan"
+      case .enabled: "Mulai Tes"
+      case .disabled: "Dalam Pengecekan"
       }
     }
 
     var backgroundColor: UIColor {
       switch self {
       case .enabled:
-        return UIColor(red: 51.0 / 255.0, green: 185.0 / 255.0, blue: 255.0 / 255.0, alpha: 1)
+        UIColor(red: 51.0 / 255.0, green: 185.0 / 255.0, blue: 255.0 / 255.0, alpha: 1)
       case .disabled:
-        return UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1)
+        UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1)
       }
     }
 
     var textColor: UIColor {
       switch self {
-      case .enabled: return .white
+      case .enabled: .white
       case .disabled:
-        return UIColor(red: 154.0 / 255.0, green: 160.0 / 255.0, blue: 163.0 / 255.0, alpha: 1)
+        UIColor(red: 154.0 / 255.0, green: 160.0 / 255.0, blue: 163.0 / 255.0, alpha: 1)
       }
     }
   }
-
-  // MARK: - Constants
 
   private enum Constants {
     static let navigationTitle = "Cek Fungsi Software"
@@ -51,8 +68,18 @@ final class DeviceTestViewController: UIViewController {
     static let estimatedRowHeight: CGFloat = 64
     static let tableContentInset = UIEdgeInsets(top: 20, left: 0, bottom: 20, right: 0)
 
-    static let navigationTitleColor = UIColor(red: 0, green: 102.0 / 255.0, blue: 200.0 / 255.0, alpha: 1)
-    static let tableBackgroundColor = UIColor(red: 232.0 / 255.0, green: 238.0 / 255.0, blue: 241.0 / 255.0, alpha: 1)
+    static let navigationTitleColor = UIColor(
+      red: 0,
+      green: 102.0 / 255.0,
+      blue: 200.0 / 255.0,
+      alpha: 1,
+    )
+    static let tableBackgroundColor = UIColor(
+      red: 232.0 / 255.0,
+      green: 238.0 / 255.0,
+      blue: 241.0 / 255.0,
+      alpha: 1,
+    )
   }
 
   private enum Layout {
@@ -61,8 +88,6 @@ final class DeviceTestViewController: UIViewController {
     static let actionButtonHeight: CGFloat = 48
     static let actionButtonCornerRadius: CGFloat = 10
   }
-
-  // MARK: - Properties
 
   private let testItems: [String] = [
     "Battery Health",
@@ -81,9 +106,7 @@ final class DeviceTestViewController: UIViewController {
     "Ambient Light SensorAmbient Light SensorAmbient Light SensorAmbient Light Sensor",
   ]
 
-  private var currentStatus: TestStatus = .disabled
-
-  // MARK: - UI Components
+  private var currentStatus = TestStatus.disabled
 
   private lazy var fullScreenView: UIView = {
     let view = UIView()
@@ -118,25 +141,6 @@ final class DeviceTestViewController: UIViewController {
     return button
   }()
 
-  // MARK: - Lifecycle
-
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    setupViewController()
-  }
-
-  override func viewWillAppear(_ animated: Bool) {
-    super.viewWillAppear(animated)
-    navigationController?.setNavigationBarHidden(false, animated: animated)
-  }
-
-  override func viewDidLayoutSubviews() {
-    super.viewDidLayoutSubviews()
-    updateTableSpacerViews()
-  }
-
-  // MARK: - Setup
-
   private func setupViewController() {
     setupAppearance()
     setupNavigationBar()
@@ -159,7 +163,7 @@ final class DeviceTestViewController: UIViewController {
   private func setupNavigationBar() {
     title = Constants.navigationTitle
     navigationController?.navigationBar.titleTextAttributes = [
-      .foregroundColor: Constants.navigationTitleColor,
+      .foregroundColor: Constants.navigationTitleColor
     ]
   }
 
@@ -187,13 +191,26 @@ final class DeviceTestViewController: UIViewController {
       // Action container
       actionContainerView.leadingAnchor.constraint(equalTo: fullScreenView.leadingAnchor),
       actionContainerView.trailingAnchor.constraint(equalTo: fullScreenView.trailingAnchor),
-      actionContainerView.bottomAnchor.constraint(equalTo: fullScreenView.safeAreaLayoutGuide.bottomAnchor),
+      actionContainerView.bottomAnchor.constraint(
+        equalTo: fullScreenView.safeAreaLayoutGuide.bottomAnchor),
 
       // Action button
-      actionButton.leadingAnchor.constraint(equalTo: actionContainerView.leadingAnchor, constant: Layout.actionHorizontalInset),
-      actionButton.trailingAnchor.constraint(equalTo: actionContainerView.trailingAnchor, constant: -Layout.actionHorizontalInset),
-      actionButton.topAnchor.constraint(equalTo: actionContainerView.topAnchor, constant: Layout.actionVerticalInset),
-      actionButton.bottomAnchor.constraint(equalTo: actionContainerView.bottomAnchor, constant: -Layout.actionVerticalInset),
+      actionButton.leadingAnchor.constraint(
+        equalTo: actionContainerView.leadingAnchor,
+        constant: Layout.actionHorizontalInset,
+      ),
+      actionButton.trailingAnchor.constraint(
+        equalTo: actionContainerView.trailingAnchor,
+        constant: -Layout.actionHorizontalInset,
+      ),
+      actionButton.topAnchor.constraint(
+        equalTo: actionContainerView.topAnchor,
+        constant: Layout.actionVerticalInset,
+      ),
+      actionButton.bottomAnchor.constraint(
+        equalTo: actionContainerView.bottomAnchor,
+        constant: -Layout.actionVerticalInset,
+      ),
       actionButton.heightAnchor.constraint(equalToConstant: Layout.actionButtonHeight),
     ])
   }
@@ -201,7 +218,10 @@ final class DeviceTestViewController: UIViewController {
   private func setupTableView() {
     tableView.dataSource = self
     tableView.delegate = self
-    tableView.register(AlphaTestTableViewCell.self, forCellReuseIdentifier: Constants.cellReuseIdentifier)
+    tableView.register(
+      AlphaTestTableViewCell.self,
+      forCellReuseIdentifier: Constants.cellReuseIdentifier,
+    )
 
     tableView.tableHeaderView = createSpacerView(height: Constants.tableContentInset.top)
     tableView.tableFooterView = createSpacerView(height: Constants.tableContentInset.bottom)
@@ -218,14 +238,11 @@ final class DeviceTestViewController: UIViewController {
     updateActionButton()
   }
 
-  // MARK: - Actions
-
-  @objc private func actionButtonTapped() {
+  @objc
+  private func actionButtonTapped() {
     currentStatus = (currentStatus == .enabled) ? .disabled : .enabled
     updateActionButton()
   }
-
-  // MARK: - Private Methods
 
   private func updateActionButton() {
     actionButton.setTitle(currentStatus.title, for: .normal)
@@ -253,8 +270,6 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  // MARK: - Cell Configuration
-
   private func configureCell(_ cell: AlphaTestTableViewCell, at indexPath: IndexPath) {
     let title = testItems[indexPath.row]
     let status = statusForRow(at: indexPath)
@@ -264,25 +279,25 @@ final class DeviceTestViewController: UIViewController {
   private func statusForRow(at indexPath: IndexPath) -> AlphaTestTableViewCell.Status {
     // Alternate status for demonstration: every 3rd row shows failure
     switch indexPath.row % 3 {
-    case 0: return .failure
-    case 1: return .success
-    default: return .pending
+    case 0: .failure
+    case 1: .success
+    default: .pending
     }
   }
 }
 
-// MARK: - UITableViewDataSource
+// MARK: UITableViewDataSource
 
 extension DeviceTestViewController: UITableViewDataSource {
 
   func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int {
-    return testItems.count
+    testItems.count
   }
 
   func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
     let cell = tableView.dequeueReusableCell(
       withIdentifier: Constants.cellReuseIdentifier,
-      for: indexPath
+      for: indexPath,
     )
 
     if let testCell = cell as? AlphaTestTableViewCell {
@@ -294,7 +309,7 @@ extension DeviceTestViewController: UITableViewDataSource {
   }
 }
 
-// MARK: - UITableViewDelegate
+// MARK: UITableViewDelegate
 
 extension DeviceTestViewController: UITableViewDelegate {
   // Add delegate methods here if needed (e.g., didSelectRowAt)
