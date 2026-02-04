@@ -98,7 +98,7 @@ final class DeviceTestViewController: UIViewController {
     "Touchscreen ResponsivenessTouchscreen Responsiveness",
     "Wi-Fi Connection",
     "Bluetooth Pairing",
-    "Charging Port",
+    "Charging PortCharging PortCharging PortCharging PortCharging PortCharging PortCharging PortCharging PortCharging Port",
     "Vibration Motor",
     "Face ID / Touch ID",
     "GPS Signal",

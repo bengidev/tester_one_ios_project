@@ -37,9 +37,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   }()
 
   func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-    // Activate Auto Layout debugger in DEBUG builds
-    AutoLayoutDebugger.activate()
-
     window = UIWindow(frame: UIScreen.main.bounds)
     let rootViewController = MainViewController()
     let navigationController = UINavigationController(rootViewController: rootViewController)

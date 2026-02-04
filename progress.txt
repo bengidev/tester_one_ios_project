@@ -1,0 +1,81 @@
+# Progress Log - AlphaTestTableViewCell Layout
+
+---
+
+## 2025-02-04 - Layout Constraint Debugging Session
+
+### 15:45 - Uniform thin padding
+- Vertical gap around titleLabel matches icon vertical gap
+- Changed to uniform `thinPadding = 1%` for both
+- Min height: 15% (icon 13% + 1% each side)
+
+---
+
+## Final Implementation
+
+```swift
+// Uniform thin padding (1%)
+let thinPadding = Layout.screenWidth * 0.01
+
+// Icon: 0.5% from edge, 1% vertical padding
+iconImageView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 0.005)
+
+// Title: same 1% padding as icon
+titleLabel.topAnchor.constraint(greaterThanOrEqualTo: cardView.topAnchor, constant: thinPadding)
+titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -thinPadding)
+
+// Min height: 15%
+let minHeightConstraint = cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: 0.15)
+```
+
+---
+
+## Status: 🔄 TESTING
+
+---
+Date: 2026-02-04 17:43
+Status: ✅ COMPLETED - AlphaTestTableViewCell Layout Fixed
+
+Final Solution Summary:
+1. Removed clipsToBounds from borderView and cardView (was clipping icon on left edge)
+2. Balanced content priorities:
+   - titleLabel: .defaultHigh + 1 for horizontal compression
+   - actionButton: .defaultHigh + 2 for horizontal hugging/compression
+   - This ensures "ULANGI" is always fully visible
+3. Removed minHeightConstraint - let icon size + padding define natural minimum
+4. titleLabel vertical compression: .required (ensures multi-line expansion)
+
+Key Insight: Multi-line UILabel (numberOfLines=0) with fixed top/bottom constraints
+drives superview height naturally. No need for explicit min height constraints.
+
+Testing: Verified on iPhone 17 simulator (iOS 26.2)
+- Single line cells: Proper height, centered content
+- Multi-line cells: Expand to show full text
+- Button: "ULANGI" fully visible on all cells
+- No constraint conflicts or crashes
+
+Tools Used:
+- AutoLayoutDebugger.swift - Catches constraint violations in DEBUG
+- xcrun simctl io - Screenshots for visual verification
+- Reference: https://github.com/joshuayoes/ios-simulator-mcp for iOS simulator interaction
+
+---
+Date: 2026-02-04 18:05
+Status: ✅ REDESIGNED - AlphaTestTableViewCell matches design image
+
+Major Changes:
+1. Simplified layout - removed baseView/borderView, just cardView with shadow
+2. Icon size: 10% of screen width (was 13%)
+3. Status icon size: 5% of screen width
+4. "ULANGI" button only visible for FAILURE status (was always visible)
+5. Single-line title text (was multi-line)
+6. Proper cell spacing (8pt between cells)
+7. Clean constraints - no more overlapping text
+
+Key Design Decisions:
+- Card-based layout with shadow (no border view as in previous attempts)
+- Icon | Title | [ULANGI - only failures] | Status Icon
+- Fixed min card height: 56pt
+- Content priorities ensure button and status icon don't get compressed
+
+Matches design image: Clean, compact rows with proper spacing

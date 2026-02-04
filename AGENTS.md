@@ -62,6 +62,11 @@ Tester OneTests/                   # Unit tests
 Tester OneUITests/                 # UI tests
 ├── Tester_OneUITests.swift
 └── Tester_OneUITestsLaunchTests.swift
+
+# Process Tracking (Ralph-style)
+├── AGENTS.md                      # This file - coding guide for AI agents
+├── PROCESS.md                     # Documents attempted approaches/learnings
+└── progress.txt                   # Append-only chronological log
 ```
 
 ---
@@ -252,6 +257,220 @@ Conflicts with: <NSLayoutConstraint:0x... ...>
 ```
 
 **To disable:** Remove `AutoLayoutDebugger.activate()` from `AppDelegate.swift`
+
+---
+
+## Layout Debugging Patterns
+
+This project uses self-sizing table view cells with complex layouts. Key patterns learned:
+
+### Pattern 1: Multi-Line UILabel Constraints
+
+For UILabel with `numberOfLines = 0` (unlimited lines):
+
+```swift
+// ✅ CORRECT: Fixed constraints drive intrinsic height
+titleLabel.topAnchor.constraint(equalTo: cardView.topAnchor, constant: padding)
+titleLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -padding)
+
+// ❌ AVOID: Inequality + centerY causes ambiguity
+titleLabel.topAnchor.constraint(greaterThanOrEqualTo: cardView.topAnchor, constant: padding)
+titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -padding)
+titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor)
+```
+
+### Pattern 2: Avoid Height Constraints in Table Cells
+
+System sets `UIView-Encapsulated-Layout-Height` which may conflict:
+
+```swift
+// ❌ AVOID: May conflict with system height
+cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: minHeight)
+
+// ✅ CORRECT: Let content drive height
+// titleLabel's intrinsic size determines card height
+```
+
+### Pattern 3: Center Multiple Views
+
+Multiple views can center to same anchor:
+
+```swift
+iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor)
+actionStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor)
+titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor)
+```
+
+### Pattern 4: Priority-Based Height Constraints
+
+When system sets explicit cell height, use `.priority(.defaultHigh)`:
+
+```swift
+// ❌ AVOID: Required conflicts with system height
+// Error: Unable to simultaneously satisfy constraints
+cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: 100)
+  .priority(.required)
+
+// ✅ CORRECT: High priority allows flexibility
+cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: 100)
+  .priority(.defaultHigh)
+```
+
+**Use case:** Minimum height for single-line cells without system conflict.
+
+---
+
+### Pattern 5: Content Hugging for Text Views
+
+Prevent button text truncation ("U...GI" instead of "ULANGI"):
+
+```swift
+// ✅ CORRECT: Button sizes to fit content
+actionButton.setContentHuggingPriority(.required, for: .horizontal)
+actionButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+// Also apply to containing stack
+actionStackView.setContentHuggingPriority(.required, for: .horizontal)
+```
+
+**Key insight:** Text views need proper priorities to display fully.
+
+---
+
+### Pattern 6: Balancing Label Compression
+
+Don't over-specify compression resistance:
+
+```swift
+// ❌ AVOID: Pushes other views too aggressively
+// Result: Button gets crushed, layout breaks
+titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+// ✅ CORRECT: Let natural sizing work
+// No special settings on titleLabel
+// Instead: Set hugging on button/stack to protect them
+```
+
+---
+
+### Pattern 7: Swift Warnings as Errors
+
+This project has `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`.
+
+```swift
+// ❌ BUILD FAILS: Unused variable
+let iconBasedHeight = iconSize + (padding * 2)  // Never used
+// error: initialization of immutable value 'iconBasedHeight' was never used
+
+// ✅ CORRECT: Remove unused variables or use them
+let iconBasedHeight = iconSize + (padding * 2)
+// ... use iconBasedHeight in constraints ...
+
+// ✅ ALSO CORRECT: Explicitly ignore with _
+_ = iconSize + (padding * 2)
+```
+
+### iOS Simulator MCP Server
+
+**Tool:** [ios-simulator-mcp](https://github.com/joshuayoes/ios-simulator-mcp) - MCP server for iOS Simulator interaction
+
+**Installation:**
+```bash
+npm install -g ios-simulator-mcp
+```
+
+**Usage:**
+```bash
+# Start the MCP server
+ios-simulator-mcp
+
+# Or use with npx (no installation needed)
+npx ios-simulator-mcp
+```
+
+**Capabilities:**
+- Take screenshots of simulator
+- Simulate taps and gestures
+- Launch/kill apps
+- Read device logs
+- Alternative to Xcode UI tests for quick visual verification
+
+**Why use it:**
+- Faster than UI tests for visual regression checking
+- Can be integrated into CI/CD pipelines
+- Provides structured data about simulator state
+
+---
+
+### Debugging Resources
+
+- **Process tracking:** `PROCESS.md` - Documents attempted approaches, what worked, what didn't
+- **Progress log:** `progress.txt` - Append-only chronological log of decisions
+- **Example:** `AlphaTestTableViewCell.swift` - Self-sizing cell implementation
+
+**Why these files exist:**
+Following the [Ralph pattern](https://github.com/snarktank/ralph), these files help:
+1. New AI agents understand past attempts quickly
+2. Avoid repeating failed approaches (see Attempt 1-5 in PROCESS.md)
+3. Document patterns that work in this codebase
+4. Track complex problem-solving iterations
+
+**Critical patterns discovered:**
+- Pattern 4: Priority-based height constraints for table cells
+- Pattern 5: Content hugging prevents text truncation
+- Pattern 6: Balancing label compression resistance
+
+**When to update:**
+- After trying a new approach (add to PROCESS.md)
+- After making decisions (append to progress.txt)
+- After discovering patterns (update AGENTS.md)
+
+---
+
+### Agent Workflow Cycle (CRITICAL)
+
+**To avoid repeating mistakes, follow this cycle:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. READ DOCS                                               │
+│     ├── AGENTS.md (this file)                               │
+│     ├── PROCESS.md (attempted approaches & learnings)       │
+│     └── progress.txt (decision log)                         │
+│                                                             │
+│  2. IMPLEMENT                                               │
+│     ├── Make minimal changes                                │
+│     ├── Test via simulator/screenshots                      │
+│     └── Document approach in PROCESS.md                     │
+│                                                             │
+│  3. WRITE RESULTS                                           │
+│     ├── What was attempted                                  │
+│     ├── What worked/failed                                  │
+│     ├── Screenshots/verification                            │
+│     └── Open questions                                      │
+│                                                             │
+│  4. WAIT FOR USER CORRECTION                                │
+│     ├── User reviews results                                │
+│     ├── User points out issues                              │
+│     └── Return to step 1 with corrections                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- Prevents re-implementing failed approaches (see PROCESS.md Attempt 1-6)
+- Documents context for future agents
+- Creates accountability trail
+- User corrections become part of the documentation
+
+**Example from AlphaTestTableViewCell:**
+- Attempt 1: Fixed constraints with min height → FAILED (conflict)
+- Attempt 2-5: Various approaches → PARTIAL SUCCESS
+- Attempt 6: Final working solution → DOCUMENTED in PROCESS.md
+- User correction: Design didn't match → Attempt 7: REDESIGNED
+
+**Never skip step 3** - Even if you think it's correct, the user may spot issues you missed.
+
+---
 
 ### `run-tests.sh` - Run Unit Tests
 

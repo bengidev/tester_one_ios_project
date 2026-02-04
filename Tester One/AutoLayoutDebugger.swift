@@ -28,7 +28,7 @@ enum AutoLayoutDebugger {
     NotificationCenter.default.addObserver(
       forName: NSNotification.Name("UIViewLayoutSubviewsNotification"),
       object: nil,
-      queue: .main
+      queue: .main,
     ) { _ in
       checkForConstraintIssues()
     }
@@ -47,25 +47,25 @@ enum AutoLayoutDebugger {
     if let ambiguousView = findAmbiguousLayout(in: window) {
       let errorMessage = """
 
-      ╔══════════════════════════════════════════════════════════════════════════════╗
-      ║                    AUTO LAYOUT CONSTRAINT VIOLATION                          ║
-      ╠══════════════════════════════════════════════════════════════════════════════╣
+        ╔══════════════════════════════════════════════════════════════════════════════╗
+        ║                    AUTO LAYOUT CONSTRAINT VIOLATION                          ║
+        ╠══════════════════════════════════════════════════════════════════════════════╣
 
-      ❌ BUILD FAILED: Ambiguous layout detected!
+        ❌ BUILD FAILED: Ambiguous layout detected!
 
-      View with ambiguous layout: \(ambiguousView)
-      Identifier: \(ambiguousView.accessibilityIdentifier ?? "none")
+        View with ambiguous layout: \(ambiguousView)
+        Identifier: \(ambiguousView.accessibilityIdentifier ?? "none")
 
-      This means Auto Layout cannot determine the position/size of this view.
+        This means Auto Layout cannot determine the position/size of this view.
 
-      To fix:
-      1. Add more constraints to fully specify the view's position and size
-      2. Check for conflicting constraints
-      3. Use Debug View Hierarchy to visualize the issue
+        To fix:
+        1. Add more constraints to fully specify the view's position and size
+        2. Check for conflicting constraints
+        3. Use Debug View Hierarchy to visualize the issue
 
-      ╚══════════════════════════════════════════════════════════════════════════════╝
+        ╚══════════════════════════════════════════════════════════════════════════════╝
 
-      """
+        """
 
       fatalError(errorMessage)
     }
