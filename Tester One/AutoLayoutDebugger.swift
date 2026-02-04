@@ -24,13 +24,14 @@ enum AutoLayoutDebugger {
       checkForConstraintIssues()
     }
 
-    // Also check after every layout pass
+    // Also check after every layout pass using closure-based observer
     NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(checkForConstraintIssues),
-      name: NSNotification.Name("UIViewLayoutSubviewsNotification"),
-      object: nil
-    )
+      forName: NSNotification.Name("UIViewLayoutSubviewsNotification"),
+      object: nil,
+      queue: .main
+    ) { _ in
+      checkForConstraintIssues()
+    }
 
     print("🔍 AutoLayoutDebugger: Activated - monitoring for constraint violations")
     #endif
@@ -39,9 +40,6 @@ enum AutoLayoutDebugger {
   // MARK: Private
 
   #if DEBUG
-  private static var lastWarning: String?
-
-  @objc
   private static func checkForConstraintIssues() {
     guard let window = UIApplication.shared.windows.first else { return }
 
