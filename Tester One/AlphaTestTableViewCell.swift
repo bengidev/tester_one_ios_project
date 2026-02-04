@@ -245,16 +245,12 @@ final class AlphaTestTableViewCell: UITableViewCell {
       cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: borderWidth),
       cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -borderWidth),
 
-      // Icon - center vertically, with minimum top/bottom padding
+      // Icon - center vertically
       iconImageView.leadingAnchor.constraint(
         equalTo: cardView.leadingAnchor,
         constant: contentPadding,
       ),
       iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
-      iconImageView.topAnchor.constraint(
-        greaterThanOrEqualTo: cardView.topAnchor,
-        constant: contentPadding,
-      ),
 
       // Action stack - fixed width to allow titleLabel to fill remaining space
       actionStackView.trailingAnchor.constraint(
@@ -278,10 +274,6 @@ final class AlphaTestTableViewCell: UITableViewCell {
         constant: -stackSpacing,
       ),
       titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
-      titleLabel.topAnchor.constraint(
-        greaterThanOrEqualTo: cardView.topAnchor,
-        constant: contentPadding,
-      ),
     ])
   }
 
