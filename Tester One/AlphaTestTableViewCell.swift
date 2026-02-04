@@ -12,7 +12,7 @@ import UIKit
 /// A table view cell displaying a test item with icon, title, action button, and status indicator.
 final class AlphaTestTableViewCell: UITableViewCell {
 
-  // MARK: - Types
+  // MARK: Internal
 
   enum Status {
     case success
@@ -20,7 +20,27 @@ final class AlphaTestTableViewCell: UITableViewCell {
     case pending
   }
 
-  // MARK: - Constants
+  override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+    super.init(style: style, reuseIdentifier: reuseIdentifier)
+    setupCell()
+  }
+
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    updateShadowPath()
+  }
+
+  func configure(title: String, status: Status) {
+    titleLabel.text = title
+    applyStatus(status)
+  }
+
+  // MARK: Private
 
   private enum Constants {
     static let reuseIdentifier = "AlphaTestCell"
@@ -42,26 +62,50 @@ final class AlphaTestTableViewCell: UITableViewCell {
     static let minCellHeight = screenWidth * 0.16
     static let cornerRadius = screenWidth * 0.03
 
-    // Fonts
+    /// Fonts
     static let buttonFontSize = min(max(screenWidth * 0.032, 11), 15)
 
-    // Shadow
-    static let shadowRadius = screenWidth * 0.01
-    static let shadowOffset = CGSize(width: 0, height: screenWidth * 0.005)
+    // Shadow - soft, modern shadow that stays within cell bounds
+    static let shadowRadius: CGFloat = 3
+    static let shadowOffset = CGSize(width: 0, height: 0)
+    static let shadowOpacity: Float = 0.30
   }
 
   private enum Colors {
     static let actionButton = UIColor(
-      red: 142.0 / 255.0, green: 198.0 / 255.0, blue: 63.0 / 255.0, alpha: 1)
+      red: 142.0 / 255.0,
+      green: 198.0 / 255.0,
+      blue: 63.0 / 255.0,
+      alpha: 1,
+    )
     static let success = UIColor(
-      red: 52.0 / 255.0, green: 199.0 / 255.0, blue: 89.0 / 255.0, alpha: 1)
+      red: 52.0 / 255.0,
+      green: 199.0 / 255.0,
+      blue: 89.0 / 255.0,
+      alpha: 1,
+    )
     static let failure = UIColor(
-      red: 234.0 / 255.0, green: 58.0 / 255.0, blue: 58.0 / 255.0, alpha: 1)
+      red: 234.0 / 255.0,
+      green: 58.0 / 255.0,
+      blue: 58.0 / 255.0,
+      alpha: 1,
+    )
     static let pending = UIColor(
-      red: 199.0 / 255.0, green: 199.0 / 255.0, blue: 204.0 / 255.0, alpha: 1)
+      red: 199.0 / 255.0,
+      green: 199.0 / 255.0,
+      blue: 204.0 / 255.0,
+      alpha: 1,
+    )
   }
 
-  // MARK: - UI Components
+  private lazy var baseView: UIView = {
+    let view = UIView()
+    view.translatesAutoresizingMaskIntoConstraints = false
+    view.backgroundColor = .clear
+    view.clipsToBounds = false
+    view.layer.cornerRadius = Layout.cornerRadius
+    return view
+  }()
 
   private lazy var cardView: UIView = {
     let view = UIView()
@@ -119,39 +163,12 @@ final class AlphaTestTableViewCell: UITableViewCell {
     return stack
   }()
 
-  // MARK: - Initialization
-
-  override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-    super.init(style: style, reuseIdentifier: reuseIdentifier)
-    setupCell()
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  // MARK: - Lifecycle
-
-  override func layoutSubviews() {
-    super.layoutSubviews()
-    updateShadowPath()
-  }
-
-  // MARK: - Configuration
-
-  func configure(title: String, status: Status) {
-    titleLabel.text = title
-    applyStatus(status)
-  }
-
-  // MARK: - Private Methods
-
   private func setupCell() {
     selectionStyle = .none
     clipsToBounds = false
     backgroundColor = .clear
     contentView.backgroundColor = .clear
+    contentView.clipsToBounds = false
 
     setupAppearance()
     setupShadow()
@@ -170,14 +187,16 @@ final class AlphaTestTableViewCell: UITableViewCell {
   }
 
   private func setupShadow() {
-    cardView.layer.shadowColor = UIColor.black.cgColor
-    cardView.layer.shadowOpacity = 0.1
-    cardView.layer.shadowRadius = Layout.shadowRadius
-    cardView.layer.shadowOffset = Layout.shadowOffset
+    // Apply shadow to baseView (no clipping), not cardView (has clipping)
+    baseView.layer.shadowColor = UIColor.black.cgColor
+    baseView.layer.shadowOpacity = Layout.shadowOpacity
+    baseView.layer.shadowRadius = Layout.shadowRadius
+    baseView.layer.shadowOffset = Layout.shadowOffset
   }
 
   private func setupViewHierarchy() {
-    contentView.addSubview(cardView)
+    contentView.addSubview(baseView)
+    baseView.addSubview(cardView)
     cardView.addSubview(iconImageView)
     cardView.addSubview(titleLabel)
     cardView.addSubview(actionStackView)
@@ -187,28 +206,40 @@ final class AlphaTestTableViewCell: UITableViewCell {
     let statusSize = Layout.statusSize
 
     NSLayoutConstraint.activate([
-      // Card view
-      cardView.leadingAnchor.constraint(
+      // Base view - wraps contentView, has shadow (no clipping)
+      baseView.leadingAnchor.constraint(
         equalTo: contentView.leadingAnchor, constant: Layout.outerPadding),
-      cardView.trailingAnchor.constraint(
+      baseView.trailingAnchor.constraint(
         equalTo: contentView.trailingAnchor, constant: -Layout.outerPadding),
-      cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.outerPadding),
-      cardView.bottomAnchor.constraint(
+      baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.outerPadding),
+      baseView.bottomAnchor.constraint(
         equalTo: contentView.bottomAnchor, constant: -Layout.outerPadding),
-      cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.minCellHeight),
+      baseView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.minCellHeight),
+
+      // Card view - fills baseView, handles content clipping
+      cardView.leadingAnchor.constraint(equalTo: baseView.leadingAnchor),
+      cardView.trailingAnchor.constraint(equalTo: baseView.trailingAnchor),
+      cardView.topAnchor.constraint(equalTo: baseView.topAnchor),
+      cardView.bottomAnchor.constraint(equalTo: baseView.bottomAnchor),
 
       // Icon - center vertically, with minimum top/bottom padding
       iconImageView.leadingAnchor.constraint(
-        equalTo: cardView.leadingAnchor, constant: Layout.contentPadding),
+        equalTo: cardView.leadingAnchor,
+        constant: Layout.contentPadding,
+      ),
       iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
       iconImageView.topAnchor.constraint(
-        greaterThanOrEqualTo: cardView.topAnchor, constant: Layout.contentPadding),
+        greaterThanOrEqualTo: cardView.topAnchor,
+        constant: Layout.contentPadding,
+      ),
       iconImageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
       iconImageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
 
       // Action stack - fixed width to allow titleLabel to fill remaining space
       actionStackView.trailingAnchor.constraint(
-        equalTo: cardView.trailingAnchor, constant: -Layout.contentPadding),
+        equalTo: cardView.trailingAnchor,
+        constant: -Layout.contentPadding,
+      ),
       actionStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
       actionStackView.widthAnchor.constraint(equalToConstant: Layout.screenWidth * 0.28),
 
@@ -218,12 +249,18 @@ final class AlphaTestTableViewCell: UITableViewCell {
 
       // Title - center vertically for single line, expand for multi-line
       titleLabel.leadingAnchor.constraint(
-        equalTo: iconImageView.trailingAnchor, constant: Layout.stackSpacing),
+        equalTo: iconImageView.trailingAnchor,
+        constant: Layout.stackSpacing,
+      ),
       titleLabel.trailingAnchor.constraint(
-        equalTo: actionStackView.leadingAnchor, constant: -Layout.stackSpacing),
+        equalTo: actionStackView.leadingAnchor,
+        constant: -Layout.stackSpacing,
+      ),
       titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
       titleLabel.topAnchor.constraint(
-        greaterThanOrEqualTo: cardView.topAnchor, constant: Layout.contentPadding),
+        greaterThanOrEqualTo: cardView.topAnchor,
+        constant: Layout.contentPadding,
+      ),
     ])
   }
 
@@ -235,9 +272,11 @@ final class AlphaTestTableViewCell: UITableViewCell {
     case .success:
       imageName = "checkmark.circle.fill"
       color = Colors.success
+
     case .failure:
       imageName = "xmark.circle.fill"
       color = Colors.failure
+
     case .pending:
       imageName = "circle"
       color = Colors.pending
@@ -247,36 +286,43 @@ final class AlphaTestTableViewCell: UITableViewCell {
       statusImageView.image = UIImage(systemName: imageName)?.withRenderingMode(.alwaysTemplate)
     } else {
       statusImageView.image = FallbackImages.statusIndicator(
-        color: color, status: status, size: Layout.statusSize)
+        color: color,
+        status: status,
+        size: Layout.statusSize,
+      )
     }
     statusImageView.tintColor = color
   }
 
   private func updateShadowPath() {
-    cardView.layer.shadowPath =
+    baseView.layer.shadowPath =
       UIBezierPath(
-        roundedRect: cardView.bounds,
-        cornerRadius: cardView.layer.cornerRadius
+        roundedRect: baseView.bounds,
+        cornerRadius: baseView.layer.cornerRadius,
       ).cgPath
   }
 }
 
-// MARK: - Fallback Images (iOS 12 Support)
+// MARK: - FallbackImages
 
 private enum FallbackImages {
+
+  // MARK: Internal
 
   static func statusIndicator(color: UIColor, status: AlphaTestTableViewCell.Status, size: CGFloat)
     -> UIImage
   {
     switch status {
     case .success:
-      return UIImage(named: "successImage") ?? UIImage()
+      UIImage(named: "successImage") ?? UIImage()
     case .failure:
-      return UIImage(named: "failedImage") ?? UIImage()
+      UIImage(named: "failedImage") ?? UIImage()
     case .pending:
-      return makeEmptyCircle(color: color, size: size)
+      makeEmptyCircle(color: color, size: size)
     }
   }
+
+  // MARK: Private
 
   private static func makeEmptyCircle(color: UIColor, size: CGFloat) -> UIImage {
     let imageSize = CGSize(width: size, height: size)
