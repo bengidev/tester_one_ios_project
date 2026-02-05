@@ -94,17 +94,17 @@ final class DeviceTestViewController: UIViewController {
     TestItem(title: "One liner"),
     TestItem(
       title:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
     ),
     TestItem(title: "Medium length title here"),
     TestItem(
       title:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."
     ),
     TestItem(title: "Test"),
     TestItem(
       title:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
     ),
   ]
 
@@ -284,10 +284,23 @@ final class DeviceTestViewController: UIViewController {
 
   /// Start all tests - show loading indicators
   private func startAllTests() {
+    // Update all models first
     for i in 0..<testItems.count {
       testItems[i].actionState = .loading
     }
-    tableView.reloadData()
+
+    // Animate the change for all visible cells
+    tableView.performBatchUpdates(
+      {
+        for cell in self.tableView.visibleCells {
+          if let testCell = cell as? DeltaTestTableViewCell {
+            testCell.setActionSectionState(.loading)
+            testCell.layoutIfNeeded()  // Animate layout changes
+          }
+        }
+      },
+      completion: nil,
+    )
 
     // Simulate async result after 2 seconds
     DispatchQueue.main.asyncAfter(deadline: .now() + Constants.mockResultDelay) { [weak self] in
@@ -297,13 +310,29 @@ final class DeviceTestViewController: UIViewController {
 
   /// Handle test results (mock: even rows succeed, odd rows fail)
   private func handleTestResults() {
+    // Update models
     for i in 0..<testItems.count {
       let isSuccess = (i % 2 == 0)
       testItems[i].actionState = isSuccess ? .success : .failed
     }
     bottomButtonState = .finish
     updateActionButton()
-    tableView.reloadData()
+
+    // Animate updates
+    tableView.performBatchUpdates(
+      {
+        for cell in self.tableView.visibleCells {
+          if let indexPath = self.tableView.indexPath(for: cell),
+            let testCell = cell as? DeltaTestTableViewCell
+          {
+            let state = self.testItems[indexPath.row].actionState
+            testCell.setActionSectionState(state)
+            testCell.layoutIfNeeded()  // Animate layout changes
+          }
+        }
+      },
+      completion: nil,
+    )
   }
 
   /// Handle retry button tap for a specific row
@@ -366,7 +395,6 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  /// Update cell state without reloading (prevents visual glitch)
   private func updateCellInPlace(
     at indexPath: IndexPath,
     state: DeltaTestTableViewCell.ActionSectionState,
@@ -374,7 +402,15 @@ final class DeviceTestViewController: UIViewController {
     guard let cell = tableView.cellForRow(at: indexPath) as? DeltaTestTableViewCell else {
       return
     }
-    cell.setActionSectionState(state)
+
+    // Perform batch updates to animate height/layout changes
+    tableView.performBatchUpdates(
+      {
+        cell.setActionSectionState(state)
+        cell.layoutIfNeeded()  // Animate layout changes
+      },
+      completion: nil,
+    )
   }
 }
 
