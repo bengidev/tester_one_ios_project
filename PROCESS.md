@@ -454,6 +454,94 @@ titleLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -th
 
 ---
 
+## CharlieTestTableViewCell - Shadow & Corner Radius Tuning
+
+### Initial Issue: Shadow Too Subtle
+
+**First Attempt:**
+```swift
+view.layer.shadowOpacity = 0.10
+view.layer.shadowRadius = 3
+view.layer.shadowOffset = CGSize(width: 0, height: 1)
+view.layer.cornerRadius = 12
+```
+
+**Issue:** Shadow not visible enough in screenshots, corner radius too subtle.
+
+### Solution: Enhanced Shadow, Corner Radius, and Cell Spacing
+
+**Final Values:**
+```swift
+// Card styling - corner radius matches design spec
+view.layer.shadowOpacity = 0.15
+view.layer.shadowRadius = 6
+view.layer.shadowOffset = CGSize(width: 0, height: 3)
+view.layer.cornerRadius = 10  // Matches design - not too round, not too square
+
+// Cell spacing (increased from 4pt to 6pt)
+baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6)
+baseView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6)
+
+// Cell background
+// In DeviceTestViewController:
+cell.backgroundColor = .clear  // Lets table view background show through
+```
+
+**Result:** Shadow now clearly visible, proper spacing between cards, table view background visible, corner radius matches design spec.
+
+### Learning: Visual Polish Requires Testing on Device/Simulator
+
+Shadow values that look good in code may not render visibly in screenshots.
+- Test with actual screenshots, not just code review
+- Increase shadow opacity/radius for better visibility
+- Corner radius of 16pt provides good visual rounding without being excessive
+
+---
+
+## EchoTestTableViewCell - Initial Implementation ✅
+
+**Goal:** Match MoneyMate list card (icon, expandable title, action button + status).
+
+**Approach:**
+```swift
+// Title drives card height
+titleLabel.topAnchor.constraint(equalTo: cardView.topAnchor, constant: verticalPadding)
+titleLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -verticalPadding)
+
+// Icon + action stack centered on title
+iconImageView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor)
+actionStackView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor)
+```
+
+**Result:** New cell file created with iOS 12 fallbacks and self-sizing layout.
+
+**Pending:** Visual verification in simulator (single-line vs multi-line title).
+
+---
+
+## EchoTestTableViewCell - Bordered Text Container ✅
+
+**Goal:** Match attached Figma concept with bordered middle text area and centered icon/action.  
+**State:** ✅ COMPLETED
+
+**Approach:**
+```swift
+// Text container drives height
+textContainerView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: verticalPadding)
+textContainerView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -verticalPadding)
+
+// Icon and action stack stay centered with text
+iconImageView.centerYAnchor.constraint(equalTo: textContainerView.centerYAnchor)
+actionStackView.centerYAnchor.constraint(equalTo: textContainerView.centerYAnchor)
+```
+
+**Notes:**
+- Reused existing assets (`cpuImage`, `successImage`, `failedImage`) before custom fallbacks.
+- Pending indicator uses a simple outlined square fallback when no asset exists.
+- Min-height constraint uses `.defaultHigh` to prevent system height conflicts.
+
+---
+
 ## References
 
 - [Ralph Pattern](https://github.com/snarktank/ralph)

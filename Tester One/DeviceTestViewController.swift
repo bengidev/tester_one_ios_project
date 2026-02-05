@@ -31,42 +31,12 @@ final class DeviceTestViewController: UIViewController {
 
   // MARK: Private
 
-  private enum TestStatus {
-    case enabled
-    case disabled
-
-    // MARK: Internal
-
-    var title: String {
-      switch self {
-      case .enabled: "Mulai Tes"
-      case .disabled: "Dalam Pengecekan"
-      }
-    }
-
-    var backgroundColor: UIColor {
-      switch self {
-      case .enabled:
-        UIColor(red: 51.0 / 255.0, green: 185.0 / 255.0, blue: 255.0 / 255.0, alpha: 1)
-      case .disabled:
-        UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1)
-      }
-    }
-
-    var textColor: UIColor {
-      switch self {
-      case .enabled: .white
-      case .disabled:
-        UIColor(red: 154.0 / 255.0, green: 160.0 / 255.0, blue: 163.0 / 255.0, alpha: 1)
-      }
-    }
-  }
-
   private enum Constants {
     static let navigationTitle = "Cek Fungsi Software"
-    static let cellReuseIdentifier = "AlphaTestCell"
-    static let estimatedRowHeight: CGFloat = 64
-    static let tableContentInset = UIEdgeInsets(top: 20, left: 0, bottom: 20, right: 0)
+    static let cellReuseIdentifier = "DeltaTestCell"
+    static let estimatedRowHeight: CGFloat = 120
+    static let tableContentInset = UIEdgeInsets(top: 16, left: 0, bottom: 16, right: 0)
+    static let mockResultDelay: TimeInterval = 2.0
 
     static let navigationTitleColor = UIColor(
       red: 0,
@@ -80,6 +50,26 @@ final class DeviceTestViewController: UIViewController {
       blue: 241.0 / 255.0,
       alpha: 1,
     )
+
+    /// Bottom button colors
+    static let primaryBlue = UIColor(
+      red: 51.0 / 255.0,
+      green: 185.0 / 255.0,
+      blue: 255.0 / 255.0,
+      alpha: 1,
+    )
+    static let disabledBackground = UIColor(
+      red: 215.0 / 255.0,
+      green: 220.0 / 255.0,
+      blue: 222.0 / 255.0,
+      alpha: 1,
+    )
+    static let disabledTitle = UIColor(
+      red: 173.0 / 255.0,
+      green: 177.0 / 255.0,
+      blue: 178.0 / 255.0,
+      alpha: 1,
+    )
   }
 
   private enum Layout {
@@ -89,24 +79,37 @@ final class DeviceTestViewController: UIViewController {
     static let actionButtonCornerRadius: CGFloat = 10
   }
 
-  private let testItems: [String] = [
-    "Battery Health",
-    "Camera Check",
-    "Speaker Test",
-    "Microphone Test",
-    "Display Brightness",
-    "Touchscreen ResponsivenessTouchscreen Responsiveness",
-    "Wi-Fi Connection",
-    "Bluetooth Pairing",
-    "Charging PortCharging PortCharging PortCharging PortCharging PortCharging PortCharging PortCharging PortCharging Port",
-    "Vibration Motor",
-    "Face ID / Touch ID",
-    "GPS Signal",
-    "Proximity Sensor",
-    "Ambient Light SensorAmbient Light SensorAmbient Light SensorAmbient Light Sensor",
+  /// Test item model with state
+  private struct TestItem {
+    let title: String
+    var actionState = DeltaTestTableViewCell.ActionSectionState.hidden
+  }
+
+  private var testItems: [TestItem] = [
+    TestItem(title: "Short title"),
+    TestItem(title: "Lorem ipsum dolor sit amet"),
+    TestItem(title: "Lorem ipsum dolor sit amet, consectetur adipiscing elit"),
+    TestItem(
+      title: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor"),
+    TestItem(title: "One liner"),
+    TestItem(
+      title:
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
+    ),
+    TestItem(title: "Medium length title here"),
+    TestItem(
+      title:
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."
+    ),
+    TestItem(title: "Test"),
+    TestItem(
+      title:
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    ),
   ]
 
-  private var currentStatus = TestStatus.disabled
+  /// Current bottom button state
+  private var bottomButtonState = DeltaTestTableViewCell.BottomButtonState.start
 
   private lazy var fullScreenView: UIView = {
     let view = UIView()
@@ -219,7 +222,7 @@ final class DeviceTestViewController: UIViewController {
     tableView.dataSource = self
     tableView.delegate = self
     tableView.register(
-      AlphaTestTableViewCell.self,
+      DeltaTestTableViewCell.self,
       forCellReuseIdentifier: Constants.cellReuseIdentifier,
     )
 
@@ -240,14 +243,96 @@ final class DeviceTestViewController: UIViewController {
 
   @objc
   private func actionButtonTapped() {
-    currentStatus = (currentStatus == .enabled) ? .disabled : .enabled
-    updateActionButton()
+    switch bottomButtonState {
+    case .start:
+      // Start test: change to "Dalam Pengecekan", show loading on all cells
+      bottomButtonState = .wait
+      updateActionButton()
+      startAllTests()
+
+    case .wait:
+      // Still waiting, do nothing
+      break
+
+    case .finish:
+      // "Lanjut" tapped - could navigate to next screen
+      handleFinishTapped()
+    }
   }
 
   private func updateActionButton() {
-    actionButton.setTitle(currentStatus.title, for: .normal)
-    actionButton.backgroundColor = currentStatus.backgroundColor
-    actionButton.setTitleColor(currentStatus.textColor, for: .normal)
+    switch bottomButtonState {
+    case .start:
+      actionButton.setTitle("Mulai Tes", for: .normal)
+      actionButton.setTitleColor(.white, for: .normal)
+      actionButton.backgroundColor = Constants.primaryBlue
+      actionButton.isEnabled = true
+
+    case .wait:
+      actionButton.setTitle("Dalam Pengecekan", for: .normal)
+      actionButton.setTitleColor(Constants.disabledTitle, for: .normal)
+      actionButton.backgroundColor = Constants.disabledBackground
+      actionButton.isEnabled = false
+
+    case .finish:
+      actionButton.setTitle("Lanjut", for: .normal)
+      actionButton.setTitleColor(.white, for: .normal)
+      actionButton.backgroundColor = Constants.primaryBlue
+      actionButton.isEnabled = true
+    }
+  }
+
+  /// Start all tests - show loading indicators
+  private func startAllTests() {
+    for i in 0..<testItems.count {
+      testItems[i].actionState = .loading
+    }
+    tableView.reloadData()
+
+    // Simulate async result after 2 seconds
+    DispatchQueue.main.asyncAfter(deadline: .now() + Constants.mockResultDelay) { [weak self] in
+      self?.handleTestResults()
+    }
+  }
+
+  /// Handle test results (mock: even rows succeed, odd rows fail)
+  private func handleTestResults() {
+    for i in 0..<testItems.count {
+      let isSuccess = (i % 2 == 0)
+      testItems[i].actionState = isSuccess ? .success : .failed
+    }
+    bottomButtonState = .finish
+    updateActionButton()
+    tableView.reloadData()
+  }
+
+  /// Handle retry button tap for a specific row
+  private func handleRetryButtonTapped(at indexPath: IndexPath) {
+    guard indexPath.row < testItems.count else { return }
+
+    // Reset to loading and update in place (no reload to avoid glitch)
+    testItems[indexPath.row].actionState = .loading
+    updateCellInPlace(at: indexPath, state: .loading)
+
+    // Simulate async result after 2 seconds
+    DispatchQueue.main.asyncAfter(deadline: .now() + Constants.mockResultDelay) { [weak self] in
+      self?.handleSingleTestResult(at: indexPath)
+    }
+  }
+
+  /// Handle single test result
+  private func handleSingleTestResult(at indexPath: IndexPath) {
+    guard indexPath.row < testItems.count else { return }
+
+    // Mock: for retry, let's make it succeed
+    testItems[indexPath.row].actionState = .success
+    updateCellInPlace(at: indexPath, state: .success)
+  }
+
+  /// Handle "Lanjut" button tap
+  private func handleFinishTapped() {
+    print("All tests finished!")
+    // Could navigate to next screen or show completion
   }
 
   private func createSpacerView(height: CGFloat) -> UIView {
@@ -270,19 +355,26 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  private func configureCell(_ cell: AlphaTestTableViewCell, at indexPath: IndexPath) {
-    let title = testItems[indexPath.row]
-    let status = statusForRow(at: indexPath)
-    cell.configure(title: title, status: status)
+  private func configureCell(_ cell: DeltaTestTableViewCell, at indexPath: IndexPath) {
+    let item = testItems[indexPath.row]
+    cell.configure(title: item.title)
+    cell.setActionSectionState(item.actionState)
+
+    // Retry button tap handler
+    cell.onRetryButtonTapped = { [weak self] in
+      self?.handleRetryButtonTapped(at: indexPath)
+    }
   }
 
-  private func statusForRow(at indexPath: IndexPath) -> AlphaTestTableViewCell.Status {
-    // Alternate status for demonstration: every 3rd row shows failure
-    switch indexPath.row % 3 {
-    case 0: .failure
-    case 1: .success
-    default: .pending
+  /// Update cell state without reloading (prevents visual glitch)
+  private func updateCellInPlace(
+    at indexPath: IndexPath,
+    state: DeltaTestTableViewCell.ActionSectionState,
+  ) {
+    guard let cell = tableView.cellForRow(at: indexPath) as? DeltaTestTableViewCell else {
+      return
     }
+    cell.setActionSectionState(state)
   }
 }
 
@@ -300,11 +392,11 @@ extension DeviceTestViewController: UITableViewDataSource {
       for: indexPath,
     )
 
-    if let testCell = cell as? AlphaTestTableViewCell {
+    if let testCell = cell as? DeltaTestTableViewCell {
       configureCell(testCell, at: indexPath)
     }
 
-    cell.backgroundColor = Constants.tableBackgroundColor
+    cell.backgroundColor = .clear
     return cell
   }
 }

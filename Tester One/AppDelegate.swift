@@ -38,7 +38,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
   func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
     window = UIWindow(frame: UIScreen.main.bounds)
-    let rootViewController = MainViewController()
+    // Set DeviceTestViewController as root for design comparison
+    let rootViewController = DeviceTestViewController()
     let navigationController = UINavigationController(rootViewController: rootViewController)
     window?.rootViewController = navigationController
     window?.makeKeyAndVisible()

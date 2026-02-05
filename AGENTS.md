@@ -370,6 +370,46 @@ let iconBasedHeight = iconSize + (padding * 2)
 _ = iconSize + (padding * 2)
 ```
 
+---
+
+### Pattern 8: Cell Background Color
+
+Ensure table view cells don't block the table background:
+
+```swift
+// ❌ AVOID: Cell background blocks table view background
+cell.backgroundColor = UIColor(red: 232/255, green: 238/255, blue: 241/255, alpha: 1)
+// Result: Background color appears on each cell instead of between cells
+
+// ✅ CORRECT: Clear cell background lets table background show through
+cell.backgroundColor = .clear
+// Table view background color shows in the spacing between cells
+```
+
+**Key insight:** For card-style cells, set the CARD's background (baseView/cardView) to white, and the CELL's background to clear so the table view's background color is visible in the gaps.
+
+---
+
+### Pattern 9: Shadow & Corner Radius Visibility
+
+Shadow values need to be prominent enough for actual visibility, and corner radius should match design:
+
+```swift
+// ❌ AVOID: Shadow too subtle to see in screenshots, corner radius too extreme
+view.layer.shadowOpacity = 0.05
+view.layer.shadowRadius = 2
+view.layer.shadowOffset = CGSize(width: 0, height: 1)
+view.layer.cornerRadius = 16  // Too round for card style
+
+// ✅ CORRECT: Visible shadow and properly rounded corners
+view.layer.shadowOpacity = 0.15
+view.layer.shadowRadius = 6
+view.layer.shadowOffset = CGSize(width: 0, height: 3)
+view.layer.cornerRadius = 10  // Matches design spec
+```
+
+**Key insight:** Always verify visual effects with actual screenshots. Corner radius of 10pt provides good visual match to the design without being too round or too square.
+
 ### iOS Simulator MCP Server
 
 **Tool:** [ios-simulator-mcp](https://github.com/joshuayoes/ios-simulator-mcp) - MCP server for iOS Simulator interaction

@@ -1,5 +1,5 @@
 //
-//  AlphaTestTableViewCell.swift
+//  BetaTestTableViewCell.swift
 //  Tester One
 //
 //  Created by ENB Mac Mini on 03/02/26.
@@ -7,10 +7,11 @@
 
 import UIKit
 
-// MARK: - AlphaTestTableViewCell
+// MARK: - BetaTestTableViewCell
 
 /// A table view cell displaying a test item with icon, title, action button, and status indicator.
-final class AlphaTestTableViewCell: UITableViewCell {
+/// Designed for "card-like" expansion where the icon and action button remain centered relative to the text.
+final class BetaTestTableViewCell: UITableViewCell {
 
   // MARK: Internal
 
@@ -43,14 +44,19 @@ final class AlphaTestTableViewCell: UITableViewCell {
   // MARK: Private
 
   private enum Constants {
-    static let reuseIdentifier = "AlphaTestCell"
+    static let reuseIdentifier = "BetaTestCell"
     static let actionButtonTitle = "ULANGI"
     static let iconName = "cpuImage"
   }
 
   private enum Layout {
     static let screenWidth = UIScreen.main.bounds.width
-    static let screenHeight = UIScreen.main.bounds.height
+    /// Using 0.08 like Alpha for consistency in base corner radius
+    static let baseCornerRadiusRatio: CGFloat = 0.08
+    /// Card corner radius
+    static let cardCornerRadiusRatio: CGFloat = 0.075
+    /// Icon size ~13% of screen
+    static let iconSizeRatio: CGFloat = 0.13
   }
 
   private enum Colors {
@@ -85,32 +91,34 @@ final class AlphaTestTableViewCell: UITableViewCell {
     view.translatesAutoresizingMaskIntoConstraints = false
     view.backgroundColor = .clear
     view.clipsToBounds = false
-    view.layer.cornerRadius = Layout.screenWidth * 0.08
-    // Shadow properties set inline
+    view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
+
+    // Shadow properties
     view.layer.shadowColor = UIColor.black.cgColor
     view.layer.shadowOpacity = 0.05
     view.layer.shadowRadius = 2
     view.layer.shadowOffset = CGSize(width: 0, height: 0)
-    view.accessibilityIdentifier = "AlphaTestCell.baseView"
+
+    view.accessibilityIdentifier = "BetaTestCell.baseView"
     return view
   }()
 
-  /// Light gray outer border view that creates the "outer half-circle" frame effect
+  /// Light gray outer border view
   private lazy var borderView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
-    view.layer.cornerRadius = Layout.screenWidth * 0.08
+    view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
     view.clipsToBounds = true
-    view.accessibilityIdentifier = "AlphaTestCell.borderView"
+    view.accessibilityIdentifier = "BetaTestCell.borderView"
     return view
   }()
 
   private lazy var cardView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
-    view.layer.cornerRadius = Layout.screenWidth * 0.075
+    view.layer.cornerRadius = Layout.screenWidth * Layout.cardCornerRadiusRatio
     view.clipsToBounds = true
-    view.accessibilityIdentifier = "AlphaTestCell.cardView"
+    view.accessibilityIdentifier = "BetaTestCell.cardView"
     return view
   }()
 
@@ -119,9 +127,9 @@ final class AlphaTestTableViewCell: UITableViewCell {
     imageView.translatesAutoresizingMaskIntoConstraints = false
     imageView.contentMode = .scaleAspectFill
     imageView.image = UIImage(named: Constants.iconName)
-    imageView.accessibilityIdentifier = "AlphaTestCell.iconImageView"
-    // Icon size: 13% of screen width (slightly smaller)
-    let iconSize = Layout.screenWidth * 0.13
+    imageView.accessibilityIdentifier = "BetaTestCell.iconImageView"
+
+    let iconSize = Layout.screenWidth * Layout.iconSizeRatio
     NSLayoutConstraint.activate([
       imageView.widthAnchor.constraint(equalToConstant: iconSize),
       imageView.heightAnchor.constraint(equalToConstant: iconSize),
@@ -132,13 +140,11 @@ final class AlphaTestTableViewCell: UITableViewCell {
   private lazy var titleLabel: UILabel = {
     let label = UILabel()
     label.translatesAutoresizingMaskIntoConstraints = false
-    // Back to body font size
     label.font = .preferredFont(forTextStyle: .body)
     label.textAlignment = .left
-    // Support multiple lines (0 = unlimited)
     label.numberOfLines = 0
-    label.accessibilityIdentifier = "AlphaTestCell.titleLabel"
-    // Ensure label can expand without being compressed
+    label.accessibilityIdentifier = "BetaTestCell.titleLabel"
+    // Vertical compression resistance to ensure text pushes the cell height
     label.setContentCompressionResistancePriority(.required, for: .vertical)
     return label
   }()
@@ -148,13 +154,14 @@ final class AlphaTestTableViewCell: UITableViewCell {
     button.translatesAutoresizingMaskIntoConstraints = false
     button.setTitle(Constants.actionButtonTitle, for: .normal)
     button.setTitleColor(.white, for: .normal)
+
     let buttonFontSize = min(max(Layout.screenWidth * 0.032, 11), 15)
     button.titleLabel?.font = .systemFont(ofSize: buttonFontSize, weight: .semibold)
     button.backgroundColor = Colors.actionButton
     button.layer.cornerRadius = Layout.screenWidth * 0.02
     button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
-    button.accessibilityIdentifier = "AlphaTestCell.actionButton"
-    // Button should size to fit content
+
+    button.accessibilityIdentifier = "BetaTestCell.actionButton"
     button.setContentHuggingPriority(.required, for: .horizontal)
     button.setContentCompressionResistancePriority(.required, for: .horizontal)
     return button
@@ -164,7 +171,12 @@ final class AlphaTestTableViewCell: UITableViewCell {
     let imageView = UIImageView()
     imageView.translatesAutoresizingMaskIntoConstraints = false
     imageView.contentMode = .scaleAspectFit
-    imageView.accessibilityIdentifier = "AlphaTestCell.statusImageView"
+    imageView.accessibilityIdentifier = "BetaTestCell.statusImageView"
+    // Fixed size for status indicator
+    NSLayoutConstraint.activate([
+      imageView.widthAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
+      imageView.heightAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
+    ])
     return imageView
   }()
 
@@ -175,7 +187,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     stack.alignment = .center
     stack.distribution = .fill
     stack.spacing = Layout.screenWidth * 0.02
-    stack.accessibilityIdentifier = "AlphaTestCell.actionStackView"
+    stack.accessibilityIdentifier = "BetaTestCell.actionStackView"
     return stack
   }()
 
@@ -201,38 +213,34 @@ final class AlphaTestTableViewCell: UITableViewCell {
     }
   }
 
-  // Shadow is configured inline in baseView lazy var
-
   private func setupViewHierarchy() {
     contentView.addSubview(baseView)
     baseView.addSubview(borderView)
     borderView.addSubview(cardView)
+
     cardView.addSubview(iconImageView)
     cardView.addSubview(titleLabel)
     cardView.addSubview(actionStackView)
   }
 
   private func setupConstraints() {
+    // Spacing constants based on screen width
     let contentPadding = Layout.screenWidth * 0.03
-    // Icon moved slightly right (was 0.5%, now 1.5%)
     let iconLeadingPadding = Layout.screenWidth * 0.012
-    // Uniform thin padding around content
-    let thinPadding = Layout.screenWidth * 0.015
     let stackSpacing = Layout.screenWidth * 0.015
     let borderWidth: CGFloat = 3
-    // Vertical padding for baseView (slightly increased)
     let verticalPadding = Layout.screenWidth * 0.015
-    // Slightly more horizontal padding for baseView
     let horizontalPadding = Layout.screenWidth * 0.025
+    let thinPadding = Layout.screenWidth * 0.015
 
-    // Minimum height: 15% (icon 13% + 1% padding each side)
+    // Minimum height constraint
     let minHeightConstraint = cardView.heightAnchor.constraint(
       greaterThanOrEqualToConstant: Layout.screenWidth * 0.15)
     minHeightConstraint.priority = .defaultHigh
     minHeightConstraint.isActive = true
 
     NSLayoutConstraint.activate([
-      // Base view - with more horizontal padding for better visual separation
+      // 1. Base View (Container)
       baseView.leadingAnchor.constraint(
         equalTo: contentView.leadingAnchor,
         constant: horizontalPadding,
@@ -247,13 +255,13 @@ final class AlphaTestTableViewCell: UITableViewCell {
         constant: -verticalPadding,
       ),
 
-      // Border view - fills baseView, creates the outer half-circle frame
+      // 2. Border View (Fills Base)
       borderView.leadingAnchor.constraint(equalTo: baseView.leadingAnchor),
       borderView.trailingAnchor.constraint(equalTo: baseView.trailingAnchor),
       borderView.topAnchor.constraint(equalTo: baseView.topAnchor),
       borderView.bottomAnchor.constraint(equalTo: baseView.bottomAnchor),
 
-      // Card view - slightly inset from borderView, fills borderView
+      // 3. Card View (Inset from Border)
       cardView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor, constant: borderWidth),
       cardView.trailingAnchor.constraint(
         equalTo: borderView.trailingAnchor,
@@ -262,18 +270,23 @@ final class AlphaTestTableViewCell: UITableViewCell {
       cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: borderWidth),
       cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -borderWidth),
 
-      // Title - expands vertically as needed
-
-      // Title - expands vertically as needed
+      // 4. Title Label (The anchor for height)
+      // Leading: Right of Icon
       titleLabel.leadingAnchor.constraint(
         equalTo: iconImageView.trailingAnchor,
         constant: stackSpacing,
       ),
+      // Trailing: Left of Action Stack
       titleLabel.trailingAnchor.constraint(
         equalTo: actionStackView.leadingAnchor,
         constant: -stackSpacing,
       ),
-      // Title has same thin padding as icon (uniform gap)
+
+      // Vertical Constraints for Title Label:
+      // It pushes the card height. We use >= constraints for top/bottom to allow growth.
+      // But we primarily want it centered.
+      // Strategy: Pin Top/Bottom with priority required, but allow the label to be centered if the card is taller (due to minHeight).
+      // However, to satisfy "card expanding when text expands", we need the text to drive the card height.
       titleLabel.topAnchor.constraint(
         greaterThanOrEqualTo: cardView.topAnchor,
         constant: thinPadding,
@@ -284,23 +297,20 @@ final class AlphaTestTableViewCell: UITableViewCell {
       ),
       titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
-      // Icon - centered vertically, closer to left edge
+      // 5. Icon Image View (Centered relative to Card -> Centered relative to Text)
+      // Since Card expands with Text, Card.centerY is Text.centerY
       iconImageView.leadingAnchor.constraint(
         equalTo: cardView.leadingAnchor,
         constant: iconLeadingPadding,
       ),
       iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
-      // Action stack - centered with icon, hugs content
+      // 6. Action Stack View (Centered relative to Card -> Centered relative to Text)
       actionStackView.trailingAnchor.constraint(
         equalTo: cardView.trailingAnchor,
         constant: -contentPadding,
       ),
       actionStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
-
-      // Status indicator
-      statusImageView.widthAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
-      statusImageView.heightAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
     ])
   }
 
@@ -349,7 +359,7 @@ private enum FallbackImages {
 
   // MARK: Internal
 
-  static func statusIndicator(color: UIColor, status: AlphaTestTableViewCell.Status, size: CGFloat)
+  static func statusIndicator(color: UIColor, status: BetaTestTableViewCell.Status, size: CGFloat)
     -> UIImage
   {
     switch status {
