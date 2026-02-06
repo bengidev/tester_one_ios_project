@@ -1,43 +1,61 @@
 #!/bin/bash
 
 # run.sh - Universal build & run script for Tester One
-# Usage: ./run.sh [simulator|device] [device-name]
-# Default: simulator
+# Usage: ./run.sh [auto|simulator|device] [device-name]
+# Default: auto (prefer real device, fallback to simulator)
 
 set -e
 
-SCHEME="Tester One"
-PROJECT="Tester One.xcodeproj"
-BUNDLE_ID="co.id.LangitMerah.Tester-One"
-MODE="${1:-simulator}"
+MODE="${1:-auto}"
 DEVICE_NAME="${2:-}"
 
+has_physical_device() {
+  xcrun xctrace list devices 2>/dev/null \
+    | grep -E "iPhone|iPad" \
+    | grep -v "Simulator" \
+    | grep -v "unavailable" >/dev/null
+}
+
+run_device_or_fallback() {
+  if has_physical_device; then
+    echo "📱 Physical device detected, targeting real device"
+    if [ -n "$DEVICE_NAME" ]; then
+      echo "Target device: $DEVICE_NAME"
+      ./run-device.sh "$DEVICE_NAME"
+    else
+      ./run-device.sh
+    fi
+  else
+    echo "📱 No physical device connected, falling back to simulator"
+    ./run-simulator.sh
+  fi
+}
+
 case "$MODE" in
+  auto|a)
+    run_device_or_fallback
+    ;;
   simulator|sim|s)
     echo "📱 Running on Simulator mode"
     ./run-simulator.sh
     ;;
   device|dev|d)
-    echo "📱 Running on Real Device mode"
-    if [ -n "$DEVICE_NAME" ]; then
-        echo "Target device: $DEVICE_NAME"
-        ./run-device.sh "$DEVICE_NAME"
-    else
-        ./run-device.sh
-    fi
+    run_device_or_fallback
     ;;
   *)
-    echo "Usage: ./run.sh [simulator|device] [device-name]"
+    echo "Usage: ./run.sh [auto|simulator|device] [device-name]"
     echo ""
     echo "Options:"
-    echo "  simulator (default) - Build and run on iOS Simulator"
-    echo "  device             - Build and install on connected iPhone/iPad"
+    echo "  auto (default)     - Use connected real device; fallback to simulator"
+    echo "  simulator          - Build and run on iOS Simulator"
+    echo "  device             - Prefer real device, fallback to simulator"
     echo ""
     echo "Examples:"
-    echo "  ./run.sh                      # Run on simulator"
+    echo "  ./run.sh                      # Auto target selection"
+    echo "  ./run.sh auto                 # Auto target selection"
     echo "  ./run.sh sim                  # Run on simulator (shorthand)"
-    echo "  ./run.sh device               # Run on first available device"
-    echo "  ./run.sh device \"iPhone Beng\" # Run on specific device"
+    echo "  ./run.sh device               # Real device if connected, else simulator"
+    echo "  ./run.sh device \"iPhone Beng\" # Match specific real device name"
     exit 1
     ;;
 esac

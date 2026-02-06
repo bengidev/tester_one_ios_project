@@ -59,42 +59,70 @@ final class DeltaTestTableViewCell: UITableViewCell {
     super.prepareForReuse()
     onRetryButtonTapped = nil
     titleLabel.text = nil
-    setActionSectionState(.hidden)
+    currentActionSectionState = .hidden
+    resetTransitionAppearance()
+    applyActionSectionState(.hidden)
   }
 
-  func configure(title: String) {
+  func configure(title: String, animated: Bool = false) {
+    if animated, titleLabel.text != nil, titleLabel.text != title, window != nil {
+      animateTitleChange()
+    }
     titleLabel.text = title
     // Force layout recalculation for cell reuse with different content
     setNeedsLayout()
     layoutIfNeeded()
   }
 
-  func setActionSectionState(_ state: ActionSectionState) {
-    // Hide all first
-    actionButton.isHidden = true
-    statusImageView.isHidden = true
-    loadingIndicator.stopAnimating()
+  func setActionSectionState(_ state: ActionSectionState, animated: Bool = false) {
+    let previousState = currentActionSectionState
+    currentActionSectionState = state
 
-    switch state {
-    case .hidden:
-      // Everything stays hidden
-      break
+    let shouldAnimateTransition =
+      animated &&
+      window != nil &&
+      shouldAnimateTextRelayout(from: previousState, to: state)
 
-    case .loading:
-      loadingIndicator.startAnimating()
-
-    case .success:
-      statusImageView.isHidden = false
-      statusImageView.image = UIImage(named: "successImage")
-
-    case .failed:
-      actionButton.isHidden = false
-      statusImageView.isHidden = false
-      statusImageView.image = UIImage(named: "failedImage")
+    if shouldAnimateTransition {
+      prepareTransitionAppearance()
     }
+
+    applyActionSectionState(state)
+
+    guard shouldAnimateTransition else {
+      resetTransitionAppearance()
+      return
+    }
+
+    UIView.animate(
+      withDuration: Animation.transitionDuration,
+      delay: 0,
+      usingSpringWithDamping: Animation.springDamping,
+      initialSpringVelocity: Animation.springVelocity,
+      options: [.curveEaseInOut, .allowUserInteraction, .beginFromCurrentState],
+      animations: {
+        self.resetTransitionAppearance()
+        self.layoutIfNeeded()
+      },
+      completion: nil,
+    )
   }
 
   // MARK: Private
+
+  private enum Animation {
+    static let transitionDuration: TimeInterval = 0.34
+    static let springDamping: CGFloat = 0.9
+    static let springVelocity: CGFloat = 0.15
+    static let minimumHeightDelta: CGFloat = 1
+    static let titleStartAlpha: CGFloat = 0.84
+    static let textScale: CGFloat = 0.992
+    static let iconStartAlpha: CGFloat = 0.9
+    static let actionStackStartAlpha: CGFloat = 0.82
+    static let cardStartScale: CGFloat = 0.998
+    static let titleChangeKey = "DeltaTestCell.titleFade"
+    static let titleChangeDuration: CFTimeInterval = 0.22
+  }
 
   private enum Constants {
     static let reuseIdentifier = "DeltaTestCell"
@@ -107,6 +135,17 @@ final class DeltaTestTableViewCell: UITableViewCell {
     static let baseCornerRadiusRatio: CGFloat = 0.08
     static let cardCornerRadiusRatio: CGFloat = 0.075
     static let iconSizeRatio: CGFloat = 0.13
+    static let iconSize = screenWidth * iconSizeRatio
+    static let actionStackSpacing = screenWidth * 0.02
+    static let contentPadding = screenWidth * 0.03
+    static let iconLeadingPadding = screenWidth * 0.012
+    static let stackSpacing = screenWidth * 0.015
+    static let borderWidth: CGFloat = 3
+    static let verticalPadding = screenWidth * 0.015
+    static let horizontalPadding = screenWidth * 0.025
+    static let thinPadding = screenWidth * 0.015
+    static let statusIndicatorSize = screenWidth * 0.06
+    static let cardMinHeight = screenWidth * 0.15
   }
 
   private enum Colors {
@@ -135,6 +174,8 @@ final class DeltaTestTableViewCell: UITableViewCell {
       alpha: 1,
     )
   }
+
+  private var currentActionSectionState = ActionSectionState.hidden
 
   private lazy var baseView: UIView = {
     let view = UIView()
@@ -179,10 +220,9 @@ final class DeltaTestTableViewCell: UITableViewCell {
     imageView.image = UIImage(named: Constants.iconName)
     imageView.accessibilityIdentifier = "DeltaTestCell.iconImageView"
 
-    let iconSize = Layout.screenWidth * Layout.iconSizeRatio
     NSLayoutConstraint.activate([
-      imageView.widthAnchor.constraint(equalToConstant: iconSize),
-      imageView.heightAnchor.constraint(equalToConstant: iconSize),
+      imageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
+      imageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
     ])
     return imageView
   }()
@@ -233,8 +273,8 @@ final class DeltaTestTableViewCell: UITableViewCell {
     imageView.isHidden = true
     // Fixed size for status indicator
     NSLayoutConstraint.activate([
-      imageView.widthAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
-      imageView.heightAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
+      imageView.widthAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+      imageView.heightAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
     ])
     return imageView
   }()
@@ -252,10 +292,9 @@ final class DeltaTestTableViewCell: UITableViewCell {
     indicator.accessibilityIdentifier = "DeltaTestCell.loadingIndicator"
 
     // Fixed size to match status image
-    let indicatorSize = Layout.screenWidth * 0.06
     NSLayoutConstraint.activate([
-      indicator.widthAnchor.constraint(equalToConstant: indicatorSize),
-      indicator.heightAnchor.constraint(equalToConstant: indicatorSize),
+      indicator.widthAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+      indicator.heightAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
     ])
     return indicator
   }()
@@ -266,13 +305,126 @@ final class DeltaTestTableViewCell: UITableViewCell {
     stack.axis = .horizontal
     stack.alignment = .center
     stack.distribution = .fill
-    stack.spacing = Layout.screenWidth * 0.02
+    stack.spacing = Layout.actionStackSpacing
     stack.accessibilityIdentifier = "DeltaTestCell.actionStackView"
     // High hugging so stack collapses when all children are hidden
     stack.setContentHuggingPriority(.required, for: .horizontal)
     stack.setContentCompressionResistancePriority(.required, for: .horizontal)
     return stack
   }()
+
+  private func applyActionSectionState(_ state: ActionSectionState) {
+    // Hide all first
+    actionButton.isHidden = true
+    statusImageView.isHidden = true
+    loadingIndicator.stopAnimating()
+
+    switch state {
+    case .hidden:
+      // Everything stays hidden
+      break
+
+    case .loading:
+      loadingIndicator.startAnimating()
+
+    case .success:
+      statusImageView.isHidden = false
+      statusImageView.image = UIImage(named: "successImage")
+
+    case .failed:
+      actionButton.isHidden = false
+      statusImageView.isHidden = false
+      statusImageView.image = UIImage(named: "failedImage")
+    }
+  }
+
+  private func animateTitleChange() {
+    let transition = CATransition()
+    transition.type = .fade
+    transition.duration = Animation.titleChangeDuration
+    titleLabel.layer.add(transition, forKey: Animation.titleChangeKey)
+  }
+
+  private func prepareTransitionAppearance() {
+    titleLabel.alpha = Animation.titleStartAlpha
+    titleLabel.transform = CGAffineTransform(scaleX: Animation.textScale, y: Animation.textScale)
+    iconImageView.alpha = Animation.iconStartAlpha
+    actionStackView.alpha = Animation.actionStackStartAlpha
+    cardView.transform = CGAffineTransform(scaleX: Animation.cardStartScale, y: Animation.cardStartScale)
+  }
+
+  private func resetTransitionAppearance() {
+    titleLabel.alpha = 1
+    titleLabel.transform = .identity
+    iconImageView.alpha = 1
+    actionStackView.alpha = 1
+    cardView.transform = .identity
+  }
+
+  private func shouldAnimateTextRelayout(from oldState: ActionSectionState, to newState: ActionSectionState)
+    -> Bool
+  {
+    guard oldState != newState else { return false }
+
+    let oldHeight = estimatedTitleHeight(for: oldState, text: titleLabel.text)
+    let newHeight = estimatedTitleHeight(for: newState, text: titleLabel.text)
+    return abs(oldHeight - newHeight) > Animation.minimumHeightDelta
+  }
+
+  private func estimatedTitleHeight(for state: ActionSectionState, text: String?) -> CGFloat {
+    guard
+      let text,
+      !text.isEmpty
+    else {
+      return 0
+    }
+
+    let width = availableTitleWidth(for: state)
+    guard width > 0 else { return 0 }
+
+    let attributes: [NSAttributedString.Key: Any] = [.font: titleLabel.font as Any]
+    let boundingRect = (text as NSString).boundingRect(
+      with: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude),
+      options: [.usesLineFragmentOrigin, .usesFontLeading],
+      attributes: attributes,
+      context: nil,
+    )
+    return ceil(boundingRect.height)
+  }
+
+  private func availableTitleWidth(for state: ActionSectionState) -> CGFloat {
+    let contentWidth = contentView.bounds.width
+    guard contentWidth > 0 else { return 0 }
+
+    let cardWidth =
+      contentWidth -
+      (Layout.horizontalPadding * 2) -
+      (Layout.borderWidth * 2)
+
+    let occupiedWidth =
+      Layout.iconLeadingPadding +
+      Layout.iconSize +
+      (Layout.stackSpacing * 2) +
+      Layout.contentPadding +
+      actionContentWidth(for: state)
+
+    return max(0, cardWidth - occupiedWidth)
+  }
+
+  private func actionContentWidth(for state: ActionSectionState) -> CGFloat {
+    switch state {
+    case .hidden:
+      return 0
+    case .loading, .success:
+      return Layout.statusIndicatorSize
+    case .failed:
+      let buttonWidth = max(
+        actionButton.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width,
+        actionButton.intrinsicContentSize.width,
+      )
+      return buttonWidth + Layout.statusIndicatorSize + actionStackView.spacing
+    }
+  }
 
   private func setupCell() {
     selectionStyle = .none
@@ -307,18 +459,9 @@ final class DeltaTestTableViewCell: UITableViewCell {
   }
 
   private func setupConstraints() {
-    // Spacing constants based on screen width
-    let contentPadding = Layout.screenWidth * 0.03
-    let iconLeadingPadding = Layout.screenWidth * 0.012
-    let stackSpacing = Layout.screenWidth * 0.015
-    let borderWidth: CGFloat = 3
-    let verticalPadding = Layout.screenWidth * 0.015
-    let horizontalPadding = Layout.screenWidth * 0.025
-    let thinPadding = Layout.screenWidth * 0.015
-
     // Minimum height constraint
     let minHeightConstraint = cardView.heightAnchor.constraint(
-      greaterThanOrEqualToConstant: Layout.screenWidth * 0.15)
+      greaterThanOrEqualToConstant: Layout.cardMinHeight)
     minHeightConstraint.priority = .defaultHigh
     minHeightConstraint.isActive = true
 
@@ -326,16 +469,16 @@ final class DeltaTestTableViewCell: UITableViewCell {
       // 1. Base View (Container)
       baseView.leadingAnchor.constraint(
         equalTo: contentView.leadingAnchor,
-        constant: horizontalPadding,
+        constant: Layout.horizontalPadding,
       ),
       baseView.trailingAnchor.constraint(
         equalTo: contentView.trailingAnchor,
-        constant: -horizontalPadding,
+        constant: -Layout.horizontalPadding,
       ),
-      baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: verticalPadding),
+      baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.verticalPadding),
       baseView.bottomAnchor.constraint(
         equalTo: contentView.bottomAnchor,
-        constant: -verticalPadding,
+        constant: -Layout.verticalPadding,
       ),
 
       // 2. Border View (Fills Base)
@@ -345,44 +488,44 @@ final class DeltaTestTableViewCell: UITableViewCell {
       borderView.bottomAnchor.constraint(equalTo: baseView.bottomAnchor),
 
       // 3. Card View (Inset from Border)
-      cardView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor, constant: borderWidth),
+      cardView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor, constant: Layout.borderWidth),
       cardView.trailingAnchor.constraint(
         equalTo: borderView.trailingAnchor,
-        constant: -borderWidth,
+        constant: -Layout.borderWidth,
       ),
-      cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: borderWidth),
-      cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -borderWidth),
+      cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: Layout.borderWidth),
+      cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -Layout.borderWidth),
 
       // 4. Title Label (The anchor for height)
       titleLabel.leadingAnchor.constraint(
         equalTo: iconImageView.trailingAnchor,
-        constant: stackSpacing,
+        constant: Layout.stackSpacing,
       ),
       titleLabel.trailingAnchor.constraint(
         equalTo: actionStackView.leadingAnchor,
-        constant: -stackSpacing,
+        constant: -Layout.stackSpacing,
       ),
       titleLabel.topAnchor.constraint(
         greaterThanOrEqualTo: cardView.topAnchor,
-        constant: thinPadding,
+        constant: Layout.thinPadding,
       ),
       titleLabel.bottomAnchor.constraint(
         lessThanOrEqualTo: cardView.bottomAnchor,
-        constant: -thinPadding,
+        constant: -Layout.thinPadding,
       ),
       titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
       // 5. Icon Image View (Centered relative to Card -> Centered relative to Text)
       iconImageView.leadingAnchor.constraint(
         equalTo: cardView.leadingAnchor,
-        constant: iconLeadingPadding,
+        constant: Layout.iconLeadingPadding,
       ),
       iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
       // 6. Action Stack View (Centered relative to Card -> Centered relative to Text)
       actionStackView.trailingAnchor.constraint(
         equalTo: cardView.trailingAnchor,
-        constant: -contentPadding,
+        constant: -Layout.contentPadding,
       ),
       actionStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
     ])

@@ -94,17 +94,17 @@ final class DeviceTestViewController: UIViewController {
     TestItem(title: "One liner"),
     TestItem(
       title:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
     ),
     TestItem(title: "Medium length title here"),
     TestItem(
       title:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."
     ),
     TestItem(title: "Test"),
     TestItem(
       title:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
     ),
   ]
 
@@ -289,18 +289,9 @@ final class DeviceTestViewController: UIViewController {
       testItems[i].actionState = .loading
     }
 
-    // Animate the change for all visible cells
-    tableView.performBatchUpdates(
-      {
-        for cell in self.tableView.visibleCells {
-          if let testCell = cell as? DeltaTestTableViewCell {
-            testCell.setActionSectionState(.loading)
-            testCell.layoutIfNeeded()  // Animate layout changes
-          }
-        }
-      },
-      completion: nil,
-    )
+    // Animate each visible cell one-by-one so text self-sizing transitions stay focused.
+    let updates = sortedVisibleIndexPaths().map { ($0, DeltaTestTableViewCell.ActionSectionState.loading) }
+    applyVisibleStateUpdatesSequentially(updates)
 
     // Simulate async result after 2 seconds
     DispatchQueue.main.asyncAfter(deadline: .now() + Constants.mockResultDelay) { [weak self] in
@@ -318,21 +309,11 @@ final class DeviceTestViewController: UIViewController {
     bottomButtonState = .finish
     updateActionButton()
 
-    // Animate updates
-    tableView.performBatchUpdates(
-      {
-        for cell in self.tableView.visibleCells {
-          if let indexPath = self.tableView.indexPath(for: cell),
-            let testCell = cell as? DeltaTestTableViewCell
-          {
-            let state = self.testItems[indexPath.row].actionState
-            testCell.setActionSectionState(state)
-            testCell.layoutIfNeeded()  // Animate layout changes
-          }
-        }
-      },
-      completion: nil,
-    )
+    // Animate each visible cell one-by-one so height/text transitions are easier to follow.
+    let updates = sortedVisibleIndexPaths().map { indexPath in
+      (indexPath, self.testItems[indexPath.row].actionState)
+    }
+    applyVisibleStateUpdatesSequentially(updates)
   }
 
   /// Handle retry button tap for a specific row
@@ -353,9 +334,9 @@ final class DeviceTestViewController: UIViewController {
   private func handleSingleTestResult(at indexPath: IndexPath) {
     guard indexPath.row < testItems.count else { return }
 
-    // Mock: for retry, let's make it succeed
-    testItems[indexPath.row].actionState = .success
-    updateCellInPlace(at: indexPath, state: .success)
+    // Mock: for retry, keep it failed to test repeated ULANGI taps consistently
+    testItems[indexPath.row].actionState = .failed
+    updateCellInPlace(at: indexPath, state: .failed)
   }
 
   /// Handle "Lanjut" button tap
@@ -387,7 +368,7 @@ final class DeviceTestViewController: UIViewController {
   private func configureCell(_ cell: DeltaTestTableViewCell, at indexPath: IndexPath) {
     let item = testItems[indexPath.row]
     cell.configure(title: item.title)
-    cell.setActionSectionState(item.actionState)
+    cell.setActionSectionState(item.actionState, animated: false)
 
     // Retry button tap handler
     cell.onRetryButtonTapped = { [weak self] in
@@ -406,10 +387,43 @@ final class DeviceTestViewController: UIViewController {
     // Perform batch updates to animate height/layout changes
     tableView.performBatchUpdates(
       {
-        cell.setActionSectionState(state)
-        cell.layoutIfNeeded()  // Animate layout changes
+        cell.setActionSectionState(state, animated: true)
+        cell.layoutIfNeeded() // Animate layout changes
       },
       completion: nil,
+    )
+  }
+
+  private func sortedVisibleIndexPaths() -> [IndexPath] {
+    (tableView.indexPathsForVisibleRows ?? []).sorted { lhs, rhs in
+      if lhs.section == rhs.section {
+        return lhs.row < rhs.row
+      }
+      return lhs.section < rhs.section
+    }
+  }
+
+  private func applyVisibleStateUpdatesSequentially(
+    _ updates: [(IndexPath, DeltaTestTableViewCell.ActionSectionState)],
+    currentIndex: Int = 0,
+  ) {
+    guard currentIndex < updates.count else { return }
+
+    let (indexPath, state) = updates[currentIndex]
+
+    guard let cell = tableView.cellForRow(at: indexPath) as? DeltaTestTableViewCell else {
+      applyVisibleStateUpdatesSequentially(updates, currentIndex: currentIndex + 1)
+      return
+    }
+
+    tableView.performBatchUpdates(
+      {
+        cell.setActionSectionState(state, animated: true)
+        cell.layoutIfNeeded() // Animate layout changes
+      },
+      completion: { [weak self] _ in
+        self?.applyVisibleStateUpdatesSequentially(updates, currentIndex: currentIndex + 1)
+      },
     )
   }
 }

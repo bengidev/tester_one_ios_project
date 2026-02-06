@@ -94,9 +94,18 @@ echo "📦 Found app at: $APP_PATH"
 echo ""
 echo "🚀 Installing on device..."
 
-# Try to install using devicectl (Xcode 15+) or ios-deploy
-echo "Attempting to install..."
-
-xcrun devicectl device process launch --device 00008030-0001501E2122202E co.id.LangitMerah.Tester-One
+# Install app on selected device
+if ! xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"; then
+    echo "❌ Failed to install app on device $DEVICE_ID"
+    exit 1
+fi
 
 echo "🚀 Launching app..."
+
+# Launch app using selected device ID
+if ! xcrun devicectl device process launch --device "$DEVICE_ID" "$BUNDLE_ID"; then
+    echo "❌ Failed to launch app on device $DEVICE_ID"
+    exit 1
+fi
+
+echo "✨ Done! App launched on real device."
