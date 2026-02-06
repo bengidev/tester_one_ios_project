@@ -10,15 +10,27 @@ import UIKit
 // MARK: - AlphaTestTableViewCell
 
 /// A table view cell displaying a test item with icon, title, action button, and status indicator.
+/// Designed for "card-like" expansion where the icon and action button remain centered relative to the text.
 final class AlphaTestTableViewCell: UITableViewCell {
 
   // MARK: Internal
 
-  enum Status {
+  /// Action section states (ULANGI button + indicator area)
+  enum ActionSectionState {
+    /// Nothing shown (initial)
+    case hidden
+    /// Loading indicator shown
+    case loading
+    /// Success image only (no ULANGI button)
     case success
-    case failure
-    case pending
+    /// ULANGI button + failed image
+    case failed
   }
+
+  static let reuseIdentifier = "AlphaTestCell"
+
+  /// Called when the ULANGI (retry) button is tapped
+  var onRetryButtonTapped: (() -> Void)?
 
   override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
     super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -35,22 +47,95 @@ final class AlphaTestTableViewCell: UITableViewCell {
     updateShadowPath()
   }
 
-  func configure(title: String, status: Status) {
+  override func prepareForReuse() {
+    super.prepareForReuse()
+    onRetryButtonTapped = nil
+    titleLabel.text = nil
+    currentActionSectionState = .hidden
+    resetTransitionAppearance()
+    applyActionSectionState(.hidden)
+  }
+
+  func configure(title: String, animated: Bool = false) {
+    if animated, titleLabel.text != nil, titleLabel.text != title, window != nil {
+      animateTitleChange()
+    }
     titleLabel.text = title
-    applyStatus(status)
+    // Mark for layout recalculation on the next pass for reused cells.
+    setNeedsLayout()
+  }
+
+  func setActionSectionState(_ state: ActionSectionState, animated: Bool = false) {
+    let previousState = currentActionSectionState
+    currentActionSectionState = state
+
+    let shouldAnimateTransition =
+      animated &&
+      window != nil &&
+      shouldAnimateTextRelayout(from: previousState, to: state)
+
+    if shouldAnimateTransition {
+      prepareTransitionAppearance()
+    }
+
+    applyActionSectionState(state)
+
+    guard shouldAnimateTransition else {
+      resetTransitionAppearance()
+      return
+    }
+
+    UIView.animate(
+      withDuration: Animation.transitionDuration,
+      delay: 0,
+      usingSpringWithDamping: Animation.springDamping,
+      initialSpringVelocity: Animation.springVelocity,
+      options: [.curveEaseInOut, .allowUserInteraction, .beginFromCurrentState],
+      animations: {
+        self.resetTransitionAppearance()
+        self.layoutIfNeeded()
+      },
+      completion: nil,
+    )
   }
 
   // MARK: Private
 
+  private enum Animation {
+    static let transitionDuration: TimeInterval = 0.34
+    static let springDamping: CGFloat = 0.9
+    static let springVelocity: CGFloat = 0.15
+    static let minimumHeightDelta: CGFloat = 1
+    static let titleStartAlpha: CGFloat = 0.84
+    static let textScale: CGFloat = 0.992
+    static let iconStartAlpha: CGFloat = 0.9
+    static let actionStackStartAlpha: CGFloat = 0.82
+    static let cardStartScale: CGFloat = 0.998
+    static let titleChangeKey = "AlphaTestCell.titleFade"
+    static let titleChangeDuration: CFTimeInterval = 0.22
+  }
+
   private enum Constants {
-    static let reuseIdentifier = "AlphaTestCell"
     static let actionButtonTitle = "ULANGI"
     static let iconName = "cpuImage"
   }
 
   private enum Layout {
     static let screenWidth = UIScreen.main.bounds.width
-    static let screenHeight = UIScreen.main.bounds.height
+    static let baseCornerRadiusRatio: CGFloat = 0.08
+    static let cardCornerRadiusRatio: CGFloat = 0.075
+    static let iconSizeRatio: CGFloat = 0.13
+    static let iconSize = screenWidth * iconSizeRatio
+    static let actionStackSpacing = screenWidth * 0.02
+    static let contentPadding = screenWidth * 0.03
+    static let iconLeadingPadding = screenWidth * 0.012
+    static let stackSpacing = screenWidth * 0.015
+    static let borderWidth: CGFloat = 3
+    static let verticalPadding = screenWidth * 0.015
+    static let horizontalPadding = screenWidth * 0.025
+    static let thinPadding = screenWidth * 0.015
+    static let statusIndicatorSize = screenWidth * 0.06
+    static let cardMinHeight = screenWidth * 0.15
   }
 
   private enum Colors {
@@ -60,46 +145,32 @@ final class AlphaTestTableViewCell: UITableViewCell {
       blue: 63.0 / 255.0,
       alpha: 1,
     )
-    static let success = UIColor(
-      red: 52.0 / 255.0,
-      green: 199.0 / 255.0,
-      blue: 89.0 / 255.0,
-      alpha: 1,
-    )
-    static let failure = UIColor(
-      red: 234.0 / 255.0,
-      green: 58.0 / 255.0,
-      blue: 58.0 / 255.0,
-      alpha: 1,
-    )
-    static let pending = UIColor(
-      red: 199.0 / 255.0,
-      green: 199.0 / 255.0,
-      blue: 204.0 / 255.0,
-      alpha: 1,
-    )
   }
+
+  private var currentActionSectionState = ActionSectionState.hidden
 
   private lazy var baseView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
     view.backgroundColor = .clear
     view.clipsToBounds = false
-    view.layer.cornerRadius = Layout.screenWidth * 0.08
-    // Shadow properties set inline
+    view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
+
+    // Shadow properties
     view.layer.shadowColor = UIColor.black.cgColor
     view.layer.shadowOpacity = 0.05
     view.layer.shadowRadius = 2
     view.layer.shadowOffset = CGSize(width: 0, height: 0)
+
     view.accessibilityIdentifier = "AlphaTestCell.baseView"
     return view
   }()
 
-  /// Light gray outer border view that creates the "outer half-circle" frame effect
+  /// Light gray outer border view
   private lazy var borderView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
-    view.layer.cornerRadius = Layout.screenWidth * 0.08
+    view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
     view.clipsToBounds = true
     view.accessibilityIdentifier = "AlphaTestCell.borderView"
     return view
@@ -108,7 +179,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
   private lazy var cardView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
-    view.layer.cornerRadius = Layout.screenWidth * 0.075
+    view.layer.cornerRadius = Layout.screenWidth * Layout.cardCornerRadiusRatio
     view.clipsToBounds = true
     view.accessibilityIdentifier = "AlphaTestCell.cardView"
     return view
@@ -120,11 +191,10 @@ final class AlphaTestTableViewCell: UITableViewCell {
     imageView.contentMode = .scaleAspectFill
     imageView.image = UIImage(named: Constants.iconName)
     imageView.accessibilityIdentifier = "AlphaTestCell.iconImageView"
-    // Icon size: 13% of screen width (slightly smaller)
-    let iconSize = Layout.screenWidth * 0.13
+
     NSLayoutConstraint.activate([
-      imageView.widthAnchor.constraint(equalToConstant: iconSize),
-      imageView.heightAnchor.constraint(equalToConstant: iconSize),
+      imageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
+      imageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
     ])
     return imageView
   }()
@@ -132,52 +202,201 @@ final class AlphaTestTableViewCell: UITableViewCell {
   private lazy var titleLabel: UILabel = {
     let label = UILabel()
     label.translatesAutoresizingMaskIntoConstraints = false
-    // Back to body font size
     label.font = .preferredFont(forTextStyle: .body)
     label.textAlignment = .left
-    // Support multiple lines (0 = unlimited)
     label.numberOfLines = 0
+    label.lineBreakMode = .byWordWrapping
     label.accessibilityIdentifier = "AlphaTestCell.titleLabel"
-    // Ensure label can expand without being compressed
+    // Vertical: required so text pushes cell height
     label.setContentCompressionResistancePriority(.required, for: .vertical)
+    // Horizontal: allow compression so text wraps when action section is visible
+    label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
     return label
   }()
 
+  /// ULANGI button (shown only in failed state)
   private lazy var actionButton: UIButton = {
     let button = UIButton(type: .system)
     button.translatesAutoresizingMaskIntoConstraints = false
     button.setTitle(Constants.actionButtonTitle, for: .normal)
     button.setTitleColor(.white, for: .normal)
+
     let buttonFontSize = min(max(Layout.screenWidth * 0.032, 11), 15)
     button.titleLabel?.font = .systemFont(ofSize: buttonFontSize, weight: .semibold)
     button.backgroundColor = Colors.actionButton
     button.layer.cornerRadius = Layout.screenWidth * 0.02
     button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+
     button.accessibilityIdentifier = "AlphaTestCell.actionButton"
-    // Button should size to fit content
     button.setContentHuggingPriority(.required, for: .horizontal)
     button.setContentCompressionResistancePriority(.required, for: .horizontal)
+    button.isHidden = true
+    button.addTarget(self, action: #selector(retryButtonTapped), for: .touchUpInside)
     return button
   }()
 
+  /// Status indicator (success/failed image)
   private lazy var statusImageView: UIImageView = {
     let imageView = UIImageView()
     imageView.translatesAutoresizingMaskIntoConstraints = false
     imageView.contentMode = .scaleAspectFit
     imageView.accessibilityIdentifier = "AlphaTestCell.statusImageView"
+    imageView.isHidden = true
+    // Fixed size for status indicator
+    NSLayoutConstraint.activate([
+      imageView.widthAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+      imageView.heightAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+    ])
     return imageView
   }()
 
+  /// Loading indicator (shown during loading state)
+  private lazy var loadingIndicator: UIActivityIndicatorView = {
+    let indicator =
+      if #available(iOS 13.0, *) {
+        UIActivityIndicatorView(style: .medium)
+      } else {
+        UIActivityIndicatorView(style: .gray)
+      }
+    indicator.translatesAutoresizingMaskIntoConstraints = false
+    indicator.hidesWhenStopped = true
+    indicator.accessibilityIdentifier = "AlphaTestCell.loadingIndicator"
+
+    // Fixed size to match status image
+    NSLayoutConstraint.activate([
+      indicator.widthAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+      indicator.heightAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+    ])
+    return indicator
+  }()
+
   private lazy var actionStackView: UIStackView = {
-    let stack = UIStackView(arrangedSubviews: [actionButton, statusImageView])
+    let stack = UIStackView(arrangedSubviews: [actionButton, statusImageView, loadingIndicator])
     stack.translatesAutoresizingMaskIntoConstraints = false
     stack.axis = .horizontal
     stack.alignment = .center
     stack.distribution = .fill
-    stack.spacing = Layout.screenWidth * 0.02
+    stack.spacing = Layout.actionStackSpacing
     stack.accessibilityIdentifier = "AlphaTestCell.actionStackView"
+    // High hugging so stack collapses when all children are hidden
+    stack.setContentHuggingPriority(.required, for: .horizontal)
+    stack.setContentCompressionResistancePriority(.required, for: .horizontal)
     return stack
   }()
+
+  private func applyActionSectionState(_ state: ActionSectionState) {
+    // Hide all first
+    actionButton.isHidden = true
+    statusImageView.isHidden = true
+    loadingIndicator.stopAnimating()
+
+    switch state {
+    case .hidden:
+      // Everything stays hidden
+      break
+
+    case .loading:
+      loadingIndicator.startAnimating()
+
+    case .success:
+      statusImageView.isHidden = false
+      statusImageView.image = UIImage(named: "successImage")
+
+    case .failed:
+      actionButton.isHidden = false
+      statusImageView.isHidden = false
+      statusImageView.image = UIImage(named: "failedImage")
+    }
+  }
+
+  private func animateTitleChange() {
+    let transition = CATransition()
+    transition.type = .fade
+    transition.duration = Animation.titleChangeDuration
+    titleLabel.layer.add(transition, forKey: Animation.titleChangeKey)
+  }
+
+  private func prepareTransitionAppearance() {
+    titleLabel.alpha = Animation.titleStartAlpha
+    titleLabel.transform = CGAffineTransform(scaleX: Animation.textScale, y: Animation.textScale)
+    iconImageView.alpha = Animation.iconStartAlpha
+    actionStackView.alpha = Animation.actionStackStartAlpha
+    cardView.transform = CGAffineTransform(scaleX: Animation.cardStartScale, y: Animation.cardStartScale)
+  }
+
+  private func resetTransitionAppearance() {
+    titleLabel.alpha = 1
+    titleLabel.transform = .identity
+    iconImageView.alpha = 1
+    actionStackView.alpha = 1
+    cardView.transform = .identity
+  }
+
+  private func shouldAnimateTextRelayout(from oldState: ActionSectionState, to newState: ActionSectionState)
+    -> Bool
+  {
+    guard oldState != newState else { return false }
+
+    let oldHeight = estimatedTitleHeight(for: oldState, text: titleLabel.text)
+    let newHeight = estimatedTitleHeight(for: newState, text: titleLabel.text)
+    return abs(oldHeight - newHeight) > Animation.minimumHeightDelta
+  }
+
+  private func estimatedTitleHeight(for state: ActionSectionState, text: String?) -> CGFloat {
+    guard
+      let text,
+      !text.isEmpty
+    else {
+      return 0
+    }
+
+    let width = availableTitleWidth(for: state)
+    guard width > 0 else { return 0 }
+
+    let attributes: [NSAttributedString.Key: Any] = [.font: titleLabel.font as Any]
+    let boundingRect = (text as NSString).boundingRect(
+      with: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude),
+      options: [.usesLineFragmentOrigin, .usesFontLeading],
+      attributes: attributes,
+      context: nil,
+    )
+    return ceil(boundingRect.height)
+  }
+
+  private func availableTitleWidth(for state: ActionSectionState) -> CGFloat {
+    let contentWidth = contentView.bounds.width
+    guard contentWidth > 0 else { return 0 }
+
+    let cardWidth =
+      contentWidth -
+      (Layout.horizontalPadding * 2) -
+      (Layout.borderWidth * 2)
+
+    let occupiedWidth =
+      Layout.iconLeadingPadding +
+      Layout.iconSize +
+      (Layout.stackSpacing * 2) +
+      Layout.contentPadding +
+      actionContentWidth(for: state)
+
+    return max(0, cardWidth - occupiedWidth)
+  }
+
+  private func actionContentWidth(for state: ActionSectionState) -> CGFloat {
+    switch state {
+    case .hidden:
+      return 0
+    case .loading, .success:
+      return Layout.statusIndicatorSize
+    case .failed:
+      let buttonWidth = max(
+        actionButton.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width,
+        actionButton.intrinsicContentSize.width,
+      )
+      return buttonWidth + Layout.statusIndicatorSize + actionStackView.spacing
+    }
+  }
 
   private func setupCell() {
     selectionStyle = .none
@@ -201,137 +420,92 @@ final class AlphaTestTableViewCell: UITableViewCell {
     }
   }
 
-  // Shadow is configured inline in baseView lazy var
-
   private func setupViewHierarchy() {
     contentView.addSubview(baseView)
     baseView.addSubview(borderView)
     borderView.addSubview(cardView)
+
     cardView.addSubview(iconImageView)
     cardView.addSubview(titleLabel)
     cardView.addSubview(actionStackView)
   }
 
   private func setupConstraints() {
-    let contentPadding = Layout.screenWidth * 0.03
-    // Icon moved slightly right (was 0.5%, now 1.5%)
-    let iconLeadingPadding = Layout.screenWidth * 0.012
-    // Uniform thin padding around content
-    let thinPadding = Layout.screenWidth * 0.015
-    let stackSpacing = Layout.screenWidth * 0.015
-    let borderWidth: CGFloat = 3
-    // Vertical padding for baseView (slightly increased)
-    let verticalPadding = Layout.screenWidth * 0.015
-    // Slightly more horizontal padding for baseView
-    let horizontalPadding = Layout.screenWidth * 0.025
-
-    // Minimum height: 15% (icon 13% + 1% padding each side)
+    // Minimum height constraint
     let minHeightConstraint = cardView.heightAnchor.constraint(
-      greaterThanOrEqualToConstant: Layout.screenWidth * 0.15)
+      greaterThanOrEqualToConstant: Layout.cardMinHeight)
     minHeightConstraint.priority = .defaultHigh
     minHeightConstraint.isActive = true
 
     NSLayoutConstraint.activate([
-      // Base view - with more horizontal padding for better visual separation
+      // 1. Base View (Container)
       baseView.leadingAnchor.constraint(
         equalTo: contentView.leadingAnchor,
-        constant: horizontalPadding,
+        constant: Layout.horizontalPadding,
       ),
       baseView.trailingAnchor.constraint(
         equalTo: contentView.trailingAnchor,
-        constant: -horizontalPadding,
+        constant: -Layout.horizontalPadding,
       ),
-      baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: verticalPadding),
+      baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.verticalPadding),
       baseView.bottomAnchor.constraint(
         equalTo: contentView.bottomAnchor,
-        constant: -verticalPadding,
+        constant: -Layout.verticalPadding,
       ),
 
-      // Border view - fills baseView, creates the outer half-circle frame
+      // 2. Border View (Fills Base)
       borderView.leadingAnchor.constraint(equalTo: baseView.leadingAnchor),
       borderView.trailingAnchor.constraint(equalTo: baseView.trailingAnchor),
       borderView.topAnchor.constraint(equalTo: baseView.topAnchor),
       borderView.bottomAnchor.constraint(equalTo: baseView.bottomAnchor),
 
-      // Card view - slightly inset from borderView, fills borderView
-      cardView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor, constant: borderWidth),
+      // 3. Card View (Inset from Border)
+      cardView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor, constant: Layout.borderWidth),
       cardView.trailingAnchor.constraint(
         equalTo: borderView.trailingAnchor,
-        constant: -borderWidth,
+        constant: -Layout.borderWidth,
       ),
-      cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: borderWidth),
-      cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -borderWidth),
+      cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: Layout.borderWidth),
+      cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -Layout.borderWidth),
 
-      // Title - expands vertically as needed
-
-      // Title - expands vertically as needed
+      // 4. Title Label (The anchor for height)
       titleLabel.leadingAnchor.constraint(
         equalTo: iconImageView.trailingAnchor,
-        constant: stackSpacing,
+        constant: Layout.stackSpacing,
       ),
       titleLabel.trailingAnchor.constraint(
         equalTo: actionStackView.leadingAnchor,
-        constant: -stackSpacing,
+        constant: -Layout.stackSpacing,
       ),
-      // Title has same thin padding as icon (uniform gap)
       titleLabel.topAnchor.constraint(
         greaterThanOrEqualTo: cardView.topAnchor,
-        constant: thinPadding,
+        constant: Layout.thinPadding,
       ),
       titleLabel.bottomAnchor.constraint(
         lessThanOrEqualTo: cardView.bottomAnchor,
-        constant: -thinPadding,
+        constant: -Layout.thinPadding,
       ),
       titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
-      // Icon - centered vertically, closer to left edge
+      // 5. Icon Image View (Centered relative to Card -> Centered relative to Text)
       iconImageView.leadingAnchor.constraint(
         equalTo: cardView.leadingAnchor,
-        constant: iconLeadingPadding,
+        constant: Layout.iconLeadingPadding,
       ),
       iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
-      // Action stack - centered with icon, hugs content
+      // 6. Action Stack View (Centered relative to Card -> Centered relative to Text)
       actionStackView.trailingAnchor.constraint(
         equalTo: cardView.trailingAnchor,
-        constant: -contentPadding,
+        constant: -Layout.contentPadding,
       ),
       actionStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
-
-      // Status indicator
-      statusImageView.widthAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
-      statusImageView.heightAnchor.constraint(equalToConstant: Layout.screenWidth * 0.06),
     ])
   }
 
-  private func applyStatus(_ status: Status) {
-    let imageName: String
-    let color: UIColor
-
-    switch status {
-    case .success:
-      imageName = "checkmark.circle.fill"
-      color = Colors.success
-
-    case .failure:
-      imageName = "xmark.circle.fill"
-      color = Colors.failure
-
-    case .pending:
-      imageName = "circle"
-      color = Colors.pending
-    }
-
-    if #available(iOS 13.0, *) {
-      statusImageView.image = UIImage(systemName: imageName)?.withRenderingMode(.alwaysTemplate)
-    } else {
-      statusImageView.image = FallbackImages.statusIndicator(
-        color: color,
-        status: status,
-        size: Layout.screenWidth * 0.06,
-      )
-    }
-    statusImageView.tintColor = color
+  @objc
+  private func retryButtonTapped() {
+    onRetryButtonTapped?()
   }
 
   private func updateShadowPath() {
@@ -340,40 +514,5 @@ final class AlphaTestTableViewCell: UITableViewCell {
         roundedRect: baseView.bounds,
         cornerRadius: baseView.layer.cornerRadius,
       ).cgPath
-  }
-}
-
-// MARK: - FallbackImages
-
-private enum FallbackImages {
-
-  // MARK: Internal
-
-  static func statusIndicator(color: UIColor, status: AlphaTestTableViewCell.Status, size: CGFloat)
-    -> UIImage
-  {
-    switch status {
-    case .success:
-      UIImage(named: "successImage") ?? UIImage()
-    case .failure:
-      UIImage(named: "failedImage") ?? UIImage()
-    case .pending:
-      makeEmptyCircle(color: color, size: size)
-    }
-  }
-
-  // MARK: Private
-
-  private static func makeEmptyCircle(color: UIColor, size: CGFloat) -> UIImage {
-    let imageSize = CGSize(width: size, height: size)
-    UIGraphicsBeginImageContextWithOptions(imageSize, false, 0)
-    defer { UIGraphicsEndImageContext() }
-
-    let rect = CGRect(origin: .zero, size: imageSize)
-    let circlePath = UIBezierPath(ovalIn: rect)
-    color.setFill()
-    circlePath.fill()
-
-    return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
   }
 }

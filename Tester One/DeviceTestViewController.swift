@@ -33,7 +33,6 @@ final class DeviceTestViewController: UIViewController {
 
   private enum Constants {
     static let navigationTitle = "Cek Fungsi Software"
-    static let cellReuseIdentifier = "DeltaTestCell"
     static let estimatedRowHeight: CGFloat = 120
     static let tableContentInset = UIEdgeInsets(top: 16, left: 0, bottom: 16, right: 0)
     static let mockResultDelay: TimeInterval = 2.0
@@ -79,10 +78,21 @@ final class DeviceTestViewController: UIViewController {
     static let actionButtonCornerRadius: CGFloat = 10
   }
 
+  private enum BottomButtonState {
+    case start
+    case wait
+    case finish
+  }
+
+  private struct StateUpdate {
+    let indexPath: IndexPath
+    let state: AlphaTestTableViewCell.ActionSectionState
+  }
+
   /// Test item model with state
   private struct TestItem {
     let title: String
-    var actionState = DeltaTestTableViewCell.ActionSectionState.hidden
+    var actionState = AlphaTestTableViewCell.ActionSectionState.hidden
   }
 
   private var testItems: [TestItem] = [
@@ -109,7 +119,9 @@ final class DeviceTestViewController: UIViewController {
   ]
 
   /// Current bottom button state
-  private var bottomButtonState = DeltaTestTableViewCell.BottomButtonState.start
+  private var bottomButtonState = BottomButtonState.start
+  private var pendingStateUpdates = [StateUpdate]()
+  private var isProcessingStateUpdate = false
 
   private lazy var fullScreenView: UIView = {
     let view = UIView()
@@ -222,8 +234,8 @@ final class DeviceTestViewController: UIViewController {
     tableView.dataSource = self
     tableView.delegate = self
     tableView.register(
-      DeltaTestTableViewCell.self,
-      forCellReuseIdentifier: Constants.cellReuseIdentifier,
+      AlphaTestTableViewCell.self,
+      forCellReuseIdentifier: AlphaTestTableViewCell.reuseIdentifier,
     )
 
     tableView.tableHeaderView = createSpacerView(height: Constants.tableContentInset.top)
@@ -290,8 +302,8 @@ final class DeviceTestViewController: UIViewController {
     }
 
     // Animate each visible cell one-by-one so text self-sizing transitions stay focused.
-    let updates = sortedVisibleIndexPaths().map { ($0, DeltaTestTableViewCell.ActionSectionState.loading) }
-    applyVisibleStateUpdatesSequentially(updates)
+    let updates = sortedVisibleIndexPaths().map { ($0, AlphaTestTableViewCell.ActionSectionState.loading) }
+    enqueueStateUpdates(updates)
 
     // Simulate async result after 2 seconds
     DispatchQueue.main.asyncAfter(deadline: .now() + Constants.mockResultDelay) { [weak self] in
@@ -313,7 +325,7 @@ final class DeviceTestViewController: UIViewController {
     let updates = sortedVisibleIndexPaths().map { indexPath in
       (indexPath, self.testItems[indexPath.row].actionState)
     }
-    applyVisibleStateUpdatesSequentially(updates)
+    enqueueStateUpdates(updates)
   }
 
   /// Handle retry button tap for a specific row
@@ -322,7 +334,7 @@ final class DeviceTestViewController: UIViewController {
 
     // Reset to loading and update in place (no reload to avoid glitch)
     testItems[indexPath.row].actionState = .loading
-    updateCellInPlace(at: indexPath, state: .loading)
+    enqueueStateUpdates([(indexPath, .loading)])
 
     // Simulate async result after 2 seconds
     DispatchQueue.main.asyncAfter(deadline: .now() + Constants.mockResultDelay) { [weak self] in
@@ -336,7 +348,7 @@ final class DeviceTestViewController: UIViewController {
 
     // Mock: for retry, keep it failed to test repeated ULANGI taps consistently
     testItems[indexPath.row].actionState = .failed
-    updateCellInPlace(at: indexPath, state: .failed)
+    enqueueStateUpdates([(indexPath, .failed)])
   }
 
   /// Handle "Lanjut" button tap
@@ -365,32 +377,61 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  private func configureCell(_ cell: DeltaTestTableViewCell, at indexPath: IndexPath) {
+  private func configureCell(_ cell: AlphaTestTableViewCell, at indexPath: IndexPath) {
     let item = testItems[indexPath.row]
     cell.configure(title: item.title)
     cell.setActionSectionState(item.actionState, animated: false)
 
     // Retry button tap handler
-    cell.onRetryButtonTapped = { [weak self] in
-      self?.handleRetryButtonTapped(at: indexPath)
+    cell.onRetryButtonTapped = { [weak self, weak cell] in
+      guard
+        let self,
+        let cell,
+        let currentIndexPath = tableView.indexPath(for: cell)
+      else { return }
+      handleRetryButtonTapped(at: currentIndexPath)
     }
   }
 
-  private func updateCellInPlace(
-    at indexPath: IndexPath,
-    state: DeltaTestTableViewCell.ActionSectionState,
-  ) {
-    guard let cell = tableView.cellForRow(at: indexPath) as? DeltaTestTableViewCell else {
+  private func enqueueStateUpdates(_ updates: [(IndexPath, AlphaTestTableViewCell.ActionSectionState)]) {
+    guard !updates.isEmpty else { return }
+    pendingStateUpdates.append(contentsOf: updates.map { StateUpdate(indexPath: $0.0, state: $0.1) })
+    processNextStateUpdateIfNeeded()
+  }
+
+  private func processNextStateUpdateIfNeeded() {
+    guard !isProcessingStateUpdate else { return }
+    guard !pendingStateUpdates.isEmpty else { return }
+
+    isProcessingStateUpdate = true
+    let nextUpdate = pendingStateUpdates.removeFirst()
+    applyStateUpdate(nextUpdate) { [weak self] in
+      guard let self else { return }
+      isProcessingStateUpdate = false
+      processNextStateUpdateIfNeeded()
+    }
+  }
+
+  private func applyStateUpdate(_ update: StateUpdate, completion: @escaping () -> Void) {
+    guard update.indexPath.row < testItems.count else {
+      completion()
+      return
+    }
+
+    guard let cell = tableView.cellForRow(at: update.indexPath) as? AlphaTestTableViewCell else {
+      completion()
       return
     }
 
     // Perform batch updates to animate height/layout changes
     tableView.performBatchUpdates(
       {
-        cell.setActionSectionState(state, animated: true)
+        cell.setActionSectionState(update.state, animated: true)
         cell.layoutIfNeeded() // Animate layout changes
       },
-      completion: nil,
+      completion: { _ in
+        completion()
+      },
     )
   }
 
@@ -403,29 +444,6 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  private func applyVisibleStateUpdatesSequentially(
-    _ updates: [(IndexPath, DeltaTestTableViewCell.ActionSectionState)],
-    currentIndex: Int = 0,
-  ) {
-    guard currentIndex < updates.count else { return }
-
-    let (indexPath, state) = updates[currentIndex]
-
-    guard let cell = tableView.cellForRow(at: indexPath) as? DeltaTestTableViewCell else {
-      applyVisibleStateUpdatesSequentially(updates, currentIndex: currentIndex + 1)
-      return
-    }
-
-    tableView.performBatchUpdates(
-      {
-        cell.setActionSectionState(state, animated: true)
-        cell.layoutIfNeeded() // Animate layout changes
-      },
-      completion: { [weak self] _ in
-        self?.applyVisibleStateUpdatesSequentially(updates, currentIndex: currentIndex + 1)
-      },
-    )
-  }
 }
 
 // MARK: UITableViewDataSource
@@ -438,11 +456,11 @@ extension DeviceTestViewController: UITableViewDataSource {
 
   func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
     let cell = tableView.dequeueReusableCell(
-      withIdentifier: Constants.cellReuseIdentifier,
+      withIdentifier: AlphaTestTableViewCell.reuseIdentifier,
       for: indexPath,
     )
 
-    if let testCell = cell as? DeltaTestTableViewCell {
+    if let testCell = cell as? AlphaTestTableViewCell {
       configureCell(testCell, at: indexPath)
     }
 
