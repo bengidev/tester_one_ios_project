@@ -44,6 +44,8 @@ final class AlphaTestTableViewCell: UITableViewCell {
 
   override func layoutSubviews() {
     super.layoutSubviews()
+    updateMetricsForCurrentWidth()
+    updateTitlePreferredMaxLayoutWidth()
     updateShadowPath()
   }
 
@@ -119,21 +121,24 @@ final class AlphaTestTableViewCell: UITableViewCell {
   }
 
   private enum Layout {
-    static let screenWidth = UIScreen.main.bounds.width
+    static let fallbackMetricsWidth: CGFloat = 390
     static let baseCornerRadiusRatio: CGFloat = 0.08
     static let cardCornerRadiusRatio: CGFloat = 0.075
     static let iconSizeRatio: CGFloat = 0.13
-    static let iconSize = screenWidth * iconSizeRatio
-    static let actionStackSpacing = screenWidth * 0.02
-    static let contentPadding = screenWidth * 0.03
-    static let iconLeadingPadding = screenWidth * 0.012
-    static let stackSpacing = screenWidth * 0.015
+    static let actionStackSpacingRatio: CGFloat = 0.02
+    static let contentPaddingRatio: CGFloat = 0.03
+    static let iconLeadingPaddingRatio: CGFloat = 0.012
+    static let stackSpacingRatio: CGFloat = 0.015
     static let borderWidth: CGFloat = 3
-    static let verticalPadding = screenWidth * 0.01
-    static let horizontalPadding = screenWidth * 0.025
-    static let thinPadding = screenWidth * 0.015
-    static let statusIndicatorSize = screenWidth * 0.06
-    static let cardMinHeight = screenWidth * 0.15
+    static let verticalPaddingRatio: CGFloat = 0.01
+    static let horizontalPaddingRatio: CGFloat = 0.025
+    static let thinPaddingRatio: CGFloat = 0.015
+    static let statusIndicatorSizeRatio: CGFloat = 0.06
+    static let cardMinHeightRatio: CGFloat = 0.15
+    static let actionButtonCornerRadiusRatio: CGFloat = 0.02
+    static let actionButtonFontSizeRatio: CGFloat = 0.032
+    static let actionButtonFontSizeMin: CGFloat = 11
+    static let actionButtonFontSizeMax: CGFloat = 15
   }
 
   private enum Colors {
@@ -145,14 +150,56 @@ final class AlphaTestTableViewCell: UITableViewCell {
     )
   }
 
+  private struct Metrics {
+    let baseCornerRadius: CGFloat
+    let cardCornerRadius: CGFloat
+    let iconSize: CGFloat
+    let actionStackSpacing: CGFloat
+    let contentPadding: CGFloat
+    let iconLeadingPadding: CGFloat
+    let stackSpacing: CGFloat
+    let verticalPadding: CGFloat
+    let horizontalPadding: CGFloat
+    let thinPadding: CGFloat
+    let statusIndicatorSize: CGFloat
+    let cardMinHeight: CGFloat
+    let actionButtonCornerRadius: CGFloat
+    let actionButtonFontSize: CGFloat
+  }
+
   private var currentActionSectionState = ActionSectionState.hidden
+  private var currentMetrics = AlphaTestTableViewCell.metrics(for: Layout.fallbackMetricsWidth)
+  private var lastAppliedWidth: CGFloat = 0
+
+  private var baseLeadingConstraint: NSLayoutConstraint?
+  private var baseTrailingConstraint: NSLayoutConstraint?
+  private var baseTopConstraint: NSLayoutConstraint?
+  private var baseBottomConstraint: NSLayoutConstraint?
+  private var cardLeadingConstraint: NSLayoutConstraint?
+  private var cardTrailingConstraint: NSLayoutConstraint?
+  private var cardTopConstraint: NSLayoutConstraint?
+  private var cardBottomConstraint: NSLayoutConstraint?
+  private var titleLeadingConstraint: NSLayoutConstraint?
+  private var titleTrailingConstraint: NSLayoutConstraint?
+  private var titleTopConstraint: NSLayoutConstraint?
+  private var titleBottomConstraint: NSLayoutConstraint?
+  private var iconLeadingConstraint: NSLayoutConstraint?
+  private var actionTrailingConstraint: NSLayoutConstraint?
+  private var iconWidthConstraint: NSLayoutConstraint?
+  private var iconHeightConstraint: NSLayoutConstraint?
+  private var actionStackWidthConstraint: NSLayoutConstraint?
+  private var statusWidthConstraint: NSLayoutConstraint?
+  private var statusHeightConstraint: NSLayoutConstraint?
+  private var loadingWidthConstraint: NSLayoutConstraint?
+  private var loadingHeightConstraint: NSLayoutConstraint?
+  private var minHeightConstraint: NSLayoutConstraint?
 
   private lazy var baseView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
     view.backgroundColor = .clear
     view.clipsToBounds = false
-    view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
+    view.layer.cornerRadius = currentMetrics.baseCornerRadius
 
     // Shadow properties
     view.layer.shadowColor = UIColor.black.cgColor
@@ -168,7 +215,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
   private lazy var borderView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
-    view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
+    view.layer.cornerRadius = currentMetrics.baseCornerRadius
     view.clipsToBounds = true
     view.accessibilityIdentifier = "AlphaTestCell.borderView"
     return view
@@ -177,7 +224,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
   private lazy var cardView: UIView = {
     let view = UIView()
     view.translatesAutoresizingMaskIntoConstraints = false
-    view.layer.cornerRadius = Layout.screenWidth * Layout.cardCornerRadiusRatio
+    view.layer.cornerRadius = currentMetrics.cardCornerRadius
     view.clipsToBounds = true
     view.accessibilityIdentifier = "AlphaTestCell.cardView"
     return view
@@ -190,9 +237,11 @@ final class AlphaTestTableViewCell: UITableViewCell {
     imageView.image = UIImage(named: Constants.iconName)
     imageView.accessibilityIdentifier = "AlphaTestCell.iconImageView"
 
+    iconWidthConstraint = imageView.widthAnchor.constraint(equalToConstant: currentMetrics.iconSize)
+    iconHeightConstraint = imageView.heightAnchor.constraint(equalToConstant: currentMetrics.iconSize)
     NSLayoutConstraint.activate([
-      imageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
-      imageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
+      iconWidthConstraint!,
+      iconHeightConstraint!,
     ])
     return imageView
   }()
@@ -209,7 +258,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     label.setContentCompressionResistancePriority(.required, for: .vertical)
     // Horizontal: allow compression so text wraps when action section is visible
     label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-    label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+    label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     return label
   }()
 
@@ -220,10 +269,12 @@ final class AlphaTestTableViewCell: UITableViewCell {
     button.setTitle(Constants.actionButtonTitle, for: .normal)
     button.setTitleColor(.white, for: .normal)
 
-    let buttonFontSize = min(max(Layout.screenWidth * 0.032, 11), 15)
-    button.titleLabel?.font = .systemFont(ofSize: buttonFontSize, weight: .semibold)
+    button.titleLabel?.font = .systemFont(
+      ofSize: currentMetrics.actionButtonFontSize,
+      weight: .semibold,
+    )
     button.backgroundColor = Colors.actionButton
-    button.layer.cornerRadius = Layout.screenWidth * 0.02
+    button.layer.cornerRadius = currentMetrics.actionButtonCornerRadius
     button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
 
     button.accessibilityIdentifier = "AlphaTestCell.actionButton"
@@ -242,9 +293,13 @@ final class AlphaTestTableViewCell: UITableViewCell {
     imageView.accessibilityIdentifier = "AlphaTestCell.statusImageView"
     imageView.isHidden = true
     // Fixed size for status indicator
+    statusWidthConstraint = imageView.widthAnchor.constraint(
+      equalToConstant: currentMetrics.statusIndicatorSize)
+    statusHeightConstraint = imageView.heightAnchor.constraint(
+      equalToConstant: currentMetrics.statusIndicatorSize)
     NSLayoutConstraint.activate([
-      imageView.widthAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
-      imageView.heightAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+      statusWidthConstraint!,
+      statusHeightConstraint!,
     ])
     return imageView
   }()
@@ -262,20 +317,24 @@ final class AlphaTestTableViewCell: UITableViewCell {
     indicator.accessibilityIdentifier = "AlphaTestCell.loadingIndicator"
 
     // Fixed size to match status image
+    loadingWidthConstraint = indicator.widthAnchor.constraint(
+      equalToConstant: currentMetrics.statusIndicatorSize)
+    loadingHeightConstraint = indicator.heightAnchor.constraint(
+      equalToConstant: currentMetrics.statusIndicatorSize)
     NSLayoutConstraint.activate([
-      indicator.widthAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
-      indicator.heightAnchor.constraint(equalToConstant: Layout.statusIndicatorSize),
+      loadingWidthConstraint!,
+      loadingHeightConstraint!,
     ])
     return indicator
   }()
 
   private lazy var actionStackView: UIStackView = {
-    let stack = UIStackView(arrangedSubviews: [actionButton, statusImageView, loadingIndicator])
+    let stack = UIStackView()
     stack.translatesAutoresizingMaskIntoConstraints = false
     stack.axis = .horizontal
     stack.alignment = .center
     stack.distribution = .fill
-    stack.spacing = Layout.actionStackSpacing
+    stack.spacing = currentMetrics.actionStackSpacing
     stack.accessibilityIdentifier = "AlphaTestCell.actionStackView"
     // High hugging so stack collapses when all children are hidden
     stack.setContentHuggingPriority(.required, for: .horizontal)
@@ -283,28 +342,65 @@ final class AlphaTestTableViewCell: UITableViewCell {
     return stack
   }()
 
+  private static func metrics(for width: CGFloat) -> Metrics {
+    let normalizedWidth = max(width, 1)
+    let actionButtonFontSize = min(
+      max(normalizedWidth * Layout.actionButtonFontSizeRatio, Layout.actionButtonFontSizeMin),
+      Layout.actionButtonFontSizeMax,
+    )
+
+    return Metrics(
+      baseCornerRadius: normalizedWidth * Layout.baseCornerRadiusRatio,
+      cardCornerRadius: normalizedWidth * Layout.cardCornerRadiusRatio,
+      iconSize: normalizedWidth * Layout.iconSizeRatio,
+      actionStackSpacing: normalizedWidth * Layout.actionStackSpacingRatio,
+      contentPadding: normalizedWidth * Layout.contentPaddingRatio,
+      iconLeadingPadding: normalizedWidth * Layout.iconLeadingPaddingRatio,
+      stackSpacing: normalizedWidth * Layout.stackSpacingRatio,
+      verticalPadding: normalizedWidth * Layout.verticalPaddingRatio,
+      horizontalPadding: normalizedWidth * Layout.horizontalPaddingRatio,
+      thinPadding: normalizedWidth * Layout.thinPaddingRatio,
+      statusIndicatorSize: normalizedWidth * Layout.statusIndicatorSizeRatio,
+      cardMinHeight: normalizedWidth * Layout.cardMinHeightRatio,
+      actionButtonCornerRadius: normalizedWidth * Layout.actionButtonCornerRadiusRatio,
+      actionButtonFontSize: actionButtonFontSize,
+    )
+  }
+
   private func applyActionSectionState(_ state: ActionSectionState) {
-    // Hide all first
-    actionButton.isHidden = true
-    statusImageView.isHidden = true
+    removeAllActionArrangedSubviews()
     loadingIndicator.stopAnimating()
 
     switch state {
     case .hidden:
-      // Everything stays hidden
       break
 
     case .loading:
+      loadingIndicator.isHidden = false
+      actionStackView.addArrangedSubview(loadingIndicator)
       loadingIndicator.startAnimating()
 
     case .success:
       statusImageView.isHidden = false
       statusImageView.image = UIImage(named: "successImage")
+      actionStackView.addArrangedSubview(statusImageView)
 
     case .failed:
       actionButton.isHidden = false
       statusImageView.isHidden = false
       statusImageView.image = UIImage(named: "failedImage")
+      actionStackView.addArrangedSubview(actionButton)
+      actionStackView.addArrangedSubview(statusImageView)
+    }
+
+    applyStateDrivenWidthConstraints(for: state)
+    updateTitlePreferredMaxLayoutWidth()
+  }
+
+  private func removeAllActionArrangedSubviews() {
+    for view in actionStackView.arrangedSubviews {
+      actionStackView.removeArrangedSubview(view)
+      view.removeFromSuperview()
     }
   }
 
@@ -321,7 +417,9 @@ final class AlphaTestTableViewCell: UITableViewCell {
     iconImageView.alpha = Animation.iconStartAlpha
     actionStackView.alpha = Animation.actionStackStartAlpha
     cardView.transform = CGAffineTransform(
-      scaleX: Animation.cardStartScale, y: Animation.cardStartScale)
+      scaleX: Animation.cardStartScale,
+      y: Animation.cardStartScale,
+    )
   }
 
   private func resetTransitionAppearance() {
@@ -333,10 +431,9 @@ final class AlphaTestTableViewCell: UITableViewCell {
   }
 
   private func shouldAnimateTextRelayout(
-    from oldState: ActionSectionState, to newState: ActionSectionState
-  )
-    -> Bool
-  {
+    from oldState: ActionSectionState,
+    to newState: ActionSectionState,
+  ) -> Bool {
     guard oldState != newState else { return false }
 
     let oldHeight = estimatedTitleHeight(for: oldState, text: titleLabel.text)
@@ -370,11 +467,11 @@ final class AlphaTestTableViewCell: UITableViewCell {
     guard contentWidth > 0 else { return 0 }
 
     let cardWidth =
-      contentWidth - (Layout.horizontalPadding * 2) - (Layout.borderWidth * 2)
+      contentWidth - (currentMetrics.horizontalPadding * 2) - (Layout.borderWidth * 2)
 
     let occupiedWidth =
-      Layout.iconLeadingPadding + Layout.iconSize + (Layout.stackSpacing * 2)
-      + Layout.contentPadding + actionContentWidth(for: state)
+      currentMetrics.iconLeadingPadding + currentMetrics.iconSize + (currentMetrics.stackSpacing * 2)
+        + currentMetrics.contentPadding + actionContentWidth(for: state)
 
     return max(0, cardWidth - occupiedWidth)
   }
@@ -384,13 +481,13 @@ final class AlphaTestTableViewCell: UITableViewCell {
     case .hidden:
       return 0
     case .loading, .success:
-      return Layout.statusIndicatorSize
+      return currentMetrics.statusIndicatorSize
     case .failed:
       let buttonWidth = max(
         actionButton.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width,
         actionButton.intrinsicContentSize.width,
       )
-      return buttonWidth + Layout.statusIndicatorSize + actionStackView.spacing
+      return buttonWidth + currentMetrics.statusIndicatorSize + actionStackView.spacing
     }
   }
 
@@ -429,26 +526,76 @@ final class AlphaTestTableViewCell: UITableViewCell {
   private func setupConstraints() {
     // Minimum height constraint
     let minHeightConstraint = cardView.heightAnchor.constraint(
-      greaterThanOrEqualToConstant: Layout.cardMinHeight)
+      greaterThanOrEqualToConstant: currentMetrics.cardMinHeight)
     minHeightConstraint.priority = .defaultHigh
     minHeightConstraint.isActive = true
+    self.minHeightConstraint = minHeightConstraint
+
+    baseLeadingConstraint = baseView.leadingAnchor.constraint(
+      equalTo: contentView.leadingAnchor,
+      constant: currentMetrics.horizontalPadding,
+    )
+    baseTrailingConstraint = baseView.trailingAnchor.constraint(
+      equalTo: contentView.trailingAnchor,
+      constant: -currentMetrics.horizontalPadding,
+    )
+    baseTopConstraint = baseView.topAnchor.constraint(
+      equalTo: contentView.topAnchor,
+      constant: currentMetrics.verticalPadding,
+    )
+    baseBottomConstraint = baseView.bottomAnchor.constraint(
+      equalTo: contentView.bottomAnchor,
+      constant: -currentMetrics.verticalPadding,
+    )
+
+    cardLeadingConstraint = cardView.leadingAnchor.constraint(
+      equalTo: borderView.leadingAnchor,
+      constant: Layout.borderWidth,
+    )
+    cardTrailingConstraint = cardView.trailingAnchor.constraint(
+      equalTo: borderView.trailingAnchor,
+      constant: -Layout.borderWidth,
+    )
+    cardTopConstraint = cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: Layout.borderWidth)
+    cardBottomConstraint = cardView.bottomAnchor.constraint(
+      equalTo: borderView.bottomAnchor,
+      constant: -Layout.borderWidth,
+    )
+
+    titleLeadingConstraint = titleLabel.leadingAnchor.constraint(
+      equalTo: iconImageView.trailingAnchor,
+      constant: currentMetrics.stackSpacing,
+    )
+    titleTrailingConstraint = titleLabel.trailingAnchor.constraint(
+      equalTo: actionStackView.leadingAnchor,
+      constant: -currentMetrics.stackSpacing,
+    )
+    titleTopConstraint = titleLabel.topAnchor.constraint(
+      greaterThanOrEqualTo: cardView.topAnchor,
+      constant: currentMetrics.thinPadding,
+    )
+    titleBottomConstraint = titleLabel.bottomAnchor.constraint(
+      lessThanOrEqualTo: cardView.bottomAnchor,
+      constant: -currentMetrics.thinPadding,
+    )
+
+    iconLeadingConstraint = iconImageView.leadingAnchor.constraint(
+      equalTo: cardView.leadingAnchor,
+      constant: currentMetrics.iconLeadingPadding,
+    )
+    actionTrailingConstraint = actionStackView.trailingAnchor.constraint(
+      equalTo: cardView.trailingAnchor,
+      constant: -currentMetrics.contentPadding,
+    )
+    actionStackWidthConstraint = actionStackView.widthAnchor.constraint(
+      equalToConstant: actionContentWidth(for: currentActionSectionState))
 
     NSLayoutConstraint.activate([
       // 1. Base View (Container)
-      baseView.leadingAnchor.constraint(
-        equalTo: contentView.leadingAnchor,
-        constant: Layout.horizontalPadding,
-      ),
-      baseView.trailingAnchor.constraint(
-        equalTo: contentView.trailingAnchor,
-        constant: -Layout.horizontalPadding,
-      ),
-      baseView.topAnchor.constraint(
-        equalTo: contentView.topAnchor, constant: Layout.verticalPadding),
-      baseView.bottomAnchor.constraint(
-        equalTo: contentView.bottomAnchor,
-        constant: -Layout.verticalPadding,
-      ),
+      baseLeadingConstraint!,
+      baseTrailingConstraint!,
+      baseTopConstraint!,
+      baseBottomConstraint!,
 
       // 2. Border View (Fills Base)
       borderView.leadingAnchor.constraint(equalTo: baseView.leadingAnchor),
@@ -457,49 +604,85 @@ final class AlphaTestTableViewCell: UITableViewCell {
       borderView.bottomAnchor.constraint(equalTo: baseView.bottomAnchor),
 
       // 3. Card View (Inset from Border)
-      cardView.leadingAnchor.constraint(
-        equalTo: borderView.leadingAnchor, constant: Layout.borderWidth),
-      cardView.trailingAnchor.constraint(
-        equalTo: borderView.trailingAnchor,
-        constant: -Layout.borderWidth,
-      ),
-      cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: Layout.borderWidth),
-      cardView.bottomAnchor.constraint(
-        equalTo: borderView.bottomAnchor, constant: -Layout.borderWidth),
+      cardLeadingConstraint!,
+      cardTrailingConstraint!,
+      cardTopConstraint!,
+      cardBottomConstraint!,
 
       // 4. Title Label (The anchor for height)
-      titleLabel.leadingAnchor.constraint(
-        equalTo: iconImageView.trailingAnchor,
-        constant: Layout.stackSpacing,
-      ),
-      titleLabel.trailingAnchor.constraint(
-        equalTo: actionStackView.leadingAnchor,
-        constant: -Layout.stackSpacing,
-      ),
-      titleLabel.topAnchor.constraint(
-        greaterThanOrEqualTo: cardView.topAnchor,
-        constant: Layout.thinPadding,
-      ),
-      titleLabel.bottomAnchor.constraint(
-        lessThanOrEqualTo: cardView.bottomAnchor,
-        constant: -Layout.thinPadding,
-      ),
+      titleLeadingConstraint!,
+      titleTrailingConstraint!,
+      titleTopConstraint!,
+      titleBottomConstraint!,
       titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
       // 5. Icon Image View (Centered relative to Card -> Centered relative to Text)
-      iconImageView.leadingAnchor.constraint(
-        equalTo: cardView.leadingAnchor,
-        constant: Layout.iconLeadingPadding,
-      ),
+      iconLeadingConstraint!,
       iconImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
       // 6. Action Stack View (Centered relative to Card -> Centered relative to Text)
-      actionStackView.trailingAnchor.constraint(
-        equalTo: cardView.trailingAnchor,
-        constant: -Layout.contentPadding,
-      ),
+      actionTrailingConstraint!,
+      actionStackWidthConstraint!,
       actionStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
     ])
+  }
+
+  private func updateMetricsForCurrentWidth(force: Bool = false) {
+    let measuredWidth = contentView.bounds.width > 0 ? contentView.bounds.width : bounds.width
+    guard measuredWidth > 0 else { return }
+
+    guard force || abs(measuredWidth - lastAppliedWidth) > 0.5 else { return }
+
+    currentMetrics = AlphaTestTableViewCell.metrics(for: measuredWidth)
+    lastAppliedWidth = measuredWidth
+    applyCurrentMetrics()
+  }
+
+  private func applyCurrentMetrics() {
+    baseView.layer.cornerRadius = currentMetrics.baseCornerRadius
+    borderView.layer.cornerRadius = currentMetrics.baseCornerRadius
+    cardView.layer.cornerRadius = currentMetrics.cardCornerRadius
+
+    actionStackView.spacing = currentMetrics.actionStackSpacing
+    actionButton.layer.cornerRadius = currentMetrics.actionButtonCornerRadius
+    actionButton.titleLabel?.font = .systemFont(ofSize: currentMetrics.actionButtonFontSize, weight: .semibold)
+
+    baseLeadingConstraint?.constant = currentMetrics.horizontalPadding
+    baseTrailingConstraint?.constant = -currentMetrics.horizontalPadding
+    baseTopConstraint?.constant = currentMetrics.verticalPadding
+    baseBottomConstraint?.constant = -currentMetrics.verticalPadding
+
+    titleLeadingConstraint?.constant = currentMetrics.stackSpacing
+    titleTrailingConstraint?.constant = -currentMetrics.stackSpacing
+    titleTopConstraint?.constant = currentMetrics.thinPadding
+    titleBottomConstraint?.constant = -currentMetrics.thinPadding
+
+    iconLeadingConstraint?.constant = currentMetrics.iconLeadingPadding
+    actionTrailingConstraint?.constant = -currentMetrics.contentPadding
+
+    iconWidthConstraint?.constant = currentMetrics.iconSize
+    iconHeightConstraint?.constant = currentMetrics.iconSize
+
+    statusWidthConstraint?.constant = currentMetrics.statusIndicatorSize
+    statusHeightConstraint?.constant = currentMetrics.statusIndicatorSize
+    loadingWidthConstraint?.constant = currentMetrics.statusIndicatorSize
+    loadingHeightConstraint?.constant = currentMetrics.statusIndicatorSize
+
+    minHeightConstraint?.constant = currentMetrics.cardMinHeight
+    applyStateDrivenWidthConstraints(for: currentActionSectionState)
+    updateTitlePreferredMaxLayoutWidth()
+  }
+
+  private func applyStateDrivenWidthConstraints(for state: ActionSectionState) {
+    actionStackWidthConstraint?.isActive = true
+    actionStackWidthConstraint?.constant = actionContentWidth(for: state)
+  }
+
+  private func updateTitlePreferredMaxLayoutWidth() {
+    let width = availableTitleWidth(for: currentActionSectionState)
+    guard width > 0 else { return }
+    guard abs(titleLabel.preferredMaxLayoutWidth - width) > 0.5 else { return }
+    titleLabel.preferredMaxLayoutWidth = width
   }
 
   @objc

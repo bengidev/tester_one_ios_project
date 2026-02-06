@@ -24,6 +24,11 @@ final class DeviceTestViewController: UIViewController {
     navigationController?.setNavigationBarHidden(false, animated: animated)
   }
 
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    performInitialTableLayoutPassIfNeeded()
+  }
+
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     updateTableSpacerViews()
@@ -122,6 +127,7 @@ final class DeviceTestViewController: UIViewController {
   private var bottomButtonState = BottomButtonState.start
   private var pendingStateUpdates = [StateUpdate]()
   private var isProcessingStateUpdate = false
+  private var hasPerformedInitialTableLayoutPass = false
 
   private lazy var fullScreenView: UIView = {
     let view = UIView()
@@ -441,6 +447,17 @@ final class DeviceTestViewController: UIViewController {
         return lhs.row < rhs.row
       }
       return lhs.section < rhs.section
+    }
+  }
+
+  private func performInitialTableLayoutPassIfNeeded() {
+    guard !hasPerformedInitialTableLayoutPass else { return }
+    hasPerformedInitialTableLayoutPass = true
+
+    UIView.performWithoutAnimation {
+      tableView.beginUpdates()
+      tableView.endUpdates()
+      tableView.layoutIfNeeded()
     }
   }
 
