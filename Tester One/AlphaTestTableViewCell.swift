@@ -70,9 +70,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     currentActionSectionState = state
 
     let shouldAnimateTransition =
-      animated &&
-      window != nil &&
-      shouldAnimateTextRelayout(from: previousState, to: state)
+      animated && window != nil && shouldAnimateTextRelayout(from: previousState, to: state)
 
     if shouldAnimateTransition {
       prepareTransitionAppearance()
@@ -131,7 +129,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     static let iconLeadingPadding = screenWidth * 0.012
     static let stackSpacing = screenWidth * 0.015
     static let borderWidth: CGFloat = 3
-    static let verticalPadding = screenWidth * 0.015
+    static let verticalPadding = screenWidth * 0.01
     static let horizontalPadding = screenWidth * 0.025
     static let thinPadding = screenWidth * 0.015
     static let statusIndicatorSize = screenWidth * 0.06
@@ -322,7 +320,8 @@ final class AlphaTestTableViewCell: UITableViewCell {
     titleLabel.transform = CGAffineTransform(scaleX: Animation.textScale, y: Animation.textScale)
     iconImageView.alpha = Animation.iconStartAlpha
     actionStackView.alpha = Animation.actionStackStartAlpha
-    cardView.transform = CGAffineTransform(scaleX: Animation.cardStartScale, y: Animation.cardStartScale)
+    cardView.transform = CGAffineTransform(
+      scaleX: Animation.cardStartScale, y: Animation.cardStartScale)
   }
 
   private func resetTransitionAppearance() {
@@ -333,7 +332,9 @@ final class AlphaTestTableViewCell: UITableViewCell {
     cardView.transform = .identity
   }
 
-  private func shouldAnimateTextRelayout(from oldState: ActionSectionState, to newState: ActionSectionState)
+  private func shouldAnimateTextRelayout(
+    from oldState: ActionSectionState, to newState: ActionSectionState
+  )
     -> Bool
   {
     guard oldState != newState else { return false }
@@ -369,16 +370,11 @@ final class AlphaTestTableViewCell: UITableViewCell {
     guard contentWidth > 0 else { return 0 }
 
     let cardWidth =
-      contentWidth -
-      (Layout.horizontalPadding * 2) -
-      (Layout.borderWidth * 2)
+      contentWidth - (Layout.horizontalPadding * 2) - (Layout.borderWidth * 2)
 
     let occupiedWidth =
-      Layout.iconLeadingPadding +
-      Layout.iconSize +
-      (Layout.stackSpacing * 2) +
-      Layout.contentPadding +
-      actionContentWidth(for: state)
+      Layout.iconLeadingPadding + Layout.iconSize + (Layout.stackSpacing * 2)
+      + Layout.contentPadding + actionContentWidth(for: state)
 
     return max(0, cardWidth - occupiedWidth)
   }
@@ -447,7 +443,8 @@ final class AlphaTestTableViewCell: UITableViewCell {
         equalTo: contentView.trailingAnchor,
         constant: -Layout.horizontalPadding,
       ),
-      baseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.verticalPadding),
+      baseView.topAnchor.constraint(
+        equalTo: contentView.topAnchor, constant: Layout.verticalPadding),
       baseView.bottomAnchor.constraint(
         equalTo: contentView.bottomAnchor,
         constant: -Layout.verticalPadding,
@@ -460,13 +457,15 @@ final class AlphaTestTableViewCell: UITableViewCell {
       borderView.bottomAnchor.constraint(equalTo: baseView.bottomAnchor),
 
       // 3. Card View (Inset from Border)
-      cardView.leadingAnchor.constraint(equalTo: borderView.leadingAnchor, constant: Layout.borderWidth),
+      cardView.leadingAnchor.constraint(
+        equalTo: borderView.leadingAnchor, constant: Layout.borderWidth),
       cardView.trailingAnchor.constraint(
         equalTo: borderView.trailingAnchor,
         constant: -Layout.borderWidth,
       ),
       cardView.topAnchor.constraint(equalTo: borderView.topAnchor, constant: Layout.borderWidth),
-      cardView.bottomAnchor.constraint(equalTo: borderView.bottomAnchor, constant: -Layout.borderWidth),
+      cardView.bottomAnchor.constraint(
+        equalTo: borderView.bottomAnchor, constant: -Layout.borderWidth),
 
       // 4. Title Label (The anchor for height)
       titleLabel.leadingAnchor.constraint(
