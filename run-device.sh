@@ -97,49 +97,6 @@ echo "🚀 Installing on device..."
 # Try to install using devicectl (Xcode 15+) or ios-deploy
 echo "Attempting to install..."
 
-# Method 1: Using devicectl (Xcode 15+)
-if xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH" 2>/dev/null; then
-    echo "✅ Installed successfully!"
-    echo ""
-    echo "🚀 Launching app..."
-    
-    # Wait a moment for the app to be registered by the system
-    sleep 1
-    
-    # Try to launch the app, capture error for debugging
-    LAUNCH_OUTPUT=$(xcrun devicectl device launch app --device "$DEVICE_ID" "$BUNDLE_ID" 2>&1) || {
-        echo "⚠️ Launch command failed"
-        echo ""
-        echo "Debug info:"
-        echo "$LAUNCH_OUTPUT" | head -5
-        echo ""
-        echo "Common causes:"
-        echo "   • Device is locked - unlock your iPhone/iPad"
-        echo "   • iOS 17+ security restriction - tap the app icon manually"
-        echo "   • App needs to be trusted in Settings → VPN & Device Management"
-        echo ""
-        echo "Please tap the app icon on your device to launch"
-    }
-    
-    if [ -n "$LAUNCH_OUTPUT" ]; then
-        echo "$LAUNCH_OUTPUT" | grep -E "(success|launched)" || true
-    fi
-    
-# Method 2: Using ios-deploy if available (better for debugging)
-elif command -v ios-deploy &> /dev/null; then
-    echo "Using ios-deploy..."
-    ios-deploy --id "$DEVICE_ID" --bundle "$APP_PATH" --debug
-else
-    echo "⚠️ Auto-install methods failed."
-    echo ""
-    echo "Please install manually:"
-    echo "   1. Open Xcode"
-    echo "   2. Select your device ($DEVICE_LINE) as target"
-    echo "   3. Press Cmd+R"
-    echo ""
-    echo "Or install ios-deploy for better device support:"
-    echo "   brew install ios-deploy"
-fi
+xcrun devicectl device process launch --device 00008030-0001501E2122202E co.id.LangitMerah.Tester-One
 
-echo ""
-echo "✨ Done!"
+echo "🚀 Launching app..."
