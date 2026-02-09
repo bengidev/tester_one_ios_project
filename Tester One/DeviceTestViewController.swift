@@ -24,14 +24,10 @@ final class DeviceTestViewController: UIViewController {
     navigationController?.setNavigationBarHidden(false, animated: animated)
   }
 
-  override func viewDidAppear(_ animated: Bool) {
-    super.viewDidAppear(animated)
-    performInitialTableLayoutPassIfNeeded()
-  }
-
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     updateTableSpacerViews()
+    updateTableRowHeightsForWidthChangeIfNeeded()
   }
 
   // MARK: Private
@@ -119,7 +115,7 @@ final class DeviceTestViewController: UIViewController {
     TestItem(title: "Test"),
     TestItem(
       title:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."
     ),
   ]
 
@@ -127,7 +123,8 @@ final class DeviceTestViewController: UIViewController {
   private var bottomButtonState = BottomButtonState.start
   private var pendingStateUpdates = [StateUpdate]()
   private var isProcessingStateUpdate = false
-  private var hasPerformedInitialTableLayoutPass = false
+  private var hasLoggedDequeuedCellClass = false
+  private var lastKnownTableWidth: CGFloat = 0
 
   private lazy var fullScreenView: UIView = {
     let view = UIView()
@@ -383,6 +380,18 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
+  private func updateTableRowHeightsForWidthChangeIfNeeded() {
+    let currentWidth = tableView.bounds.width
+    guard currentWidth > 0 else { return }
+    guard abs(currentWidth - lastKnownTableWidth) > 0.5 else { return }
+
+    lastKnownTableWidth = currentWidth
+    UIView.performWithoutAnimation {
+      tableView.beginUpdates()
+      tableView.endUpdates()
+    }
+  }
+
   private func configureCell(_ cell: AlphaTestTableViewCell, at indexPath: IndexPath) {
     let item = testItems[indexPath.row]
     cell.configure(title: item.title)
@@ -450,17 +459,6 @@ final class DeviceTestViewController: UIViewController {
     }
   }
 
-  private func performInitialTableLayoutPassIfNeeded() {
-    guard !hasPerformedInitialTableLayoutPass else { return }
-    hasPerformedInitialTableLayoutPass = true
-
-    UIView.performWithoutAnimation {
-      tableView.beginUpdates()
-      tableView.endUpdates()
-      tableView.layoutIfNeeded()
-    }
-  }
-
 }
 
 // MARK: UITableViewDataSource
@@ -478,6 +476,10 @@ extension DeviceTestViewController: UITableViewDataSource {
     )
 
     if let testCell = cell as? AlphaTestTableViewCell {
+      if !hasLoggedDequeuedCellClass {
+        print("Dequeued runtime cell class: \(type(of: testCell)) with reuseId: \(type(of: testCell).reuseIdentifier)")
+        hasLoggedDequeuedCellClass = true
+      }
       configureCell(testCell, at: indexPath)
     }
 

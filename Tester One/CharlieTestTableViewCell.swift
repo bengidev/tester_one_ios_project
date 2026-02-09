@@ -1,5 +1,5 @@
 //
-//  AlphaTestTableViewCell.swift
+//  CharlieTestTableViewCell.swift
 //  Tester One
 //
 //  Created by ENB Mac Mini on 03/02/26.
@@ -7,11 +7,11 @@
 
 import UIKit
 
-// MARK: - AlphaTestTableViewCell
+// MARK: - CharlieTestTableViewCell
 
 /// A table view cell displaying a test item with icon, title, action button, and status indicator.
 /// Designed for "card-like" expansion where the icon and action button remain centered relative to the text.
-final class AlphaTestTableViewCell: UITableViewCell {
+final class CharlieTestTableViewCell: UITableViewCell {
 
   // MARK: Internal
 
@@ -27,7 +27,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     case failed
   }
 
-  static let reuseIdentifier = "AlphaTestCell"
+  static let reuseIdentifier = "CharlieTestCell"
 
   /// Called when the ULANGI (retry) button is tapped
   var onRetryButtonTapped: (() -> Void)?
@@ -44,30 +44,13 @@ final class AlphaTestTableViewCell: UITableViewCell {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    updateTitlePreferredMaxLayoutWidth()
     updateShadowPath()
-  }
-
-  override func systemLayoutSizeFitting(
-    _ targetSize: CGSize,
-    withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
-    verticalFittingPriority: UILayoutPriority,
-  ) -> CGSize {
-    setNeedsLayout()
-    layoutIfNeeded()
-    updateTitlePreferredMaxLayoutWidth(fallbackContentWidth: targetSize.width)
-    return super.systemLayoutSizeFitting(
-      targetSize,
-      withHorizontalFittingPriority: horizontalFittingPriority,
-      verticalFittingPriority: verticalFittingPriority,
-    )
   }
 
   override func prepareForReuse() {
     super.prepareForReuse()
     onRetryButtonTapped = nil
     titleLabel.text = nil
-    titleLabel.preferredMaxLayoutWidth = 0
     currentActionSectionState = .hidden
     resetTransitionAppearance()
     applyActionSectionState(.hidden)
@@ -128,7 +111,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     static let iconStartAlpha: CGFloat = 0.9
     static let actionStackStartAlpha: CGFloat = 0.82
     static let cardStartScale: CGFloat = 0.998
-    static let titleChangeKey = "AlphaTestCell.titleFade"
+    static let titleChangeKey = "CharlieTestCell.titleFade"
     static let titleChangeDuration: CFTimeInterval = 0.22
   }
 
@@ -179,7 +162,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     view.layer.shadowRadius = 2
     view.layer.shadowOffset = CGSize(width: 0, height: 0)
 
-    view.accessibilityIdentifier = "AlphaTestCell.baseView"
+    view.accessibilityIdentifier = "CharlieTestCell.baseView"
     return view
   }()
 
@@ -189,7 +172,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     view.translatesAutoresizingMaskIntoConstraints = false
     view.layer.cornerRadius = Layout.screenWidth * Layout.baseCornerRadiusRatio
     view.clipsToBounds = true
-    view.accessibilityIdentifier = "AlphaTestCell.borderView"
+    view.accessibilityIdentifier = "CharlieTestCell.borderView"
     return view
   }()
 
@@ -198,7 +181,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     view.translatesAutoresizingMaskIntoConstraints = false
     view.layer.cornerRadius = Layout.screenWidth * Layout.cardCornerRadiusRatio
     view.clipsToBounds = true
-    view.accessibilityIdentifier = "AlphaTestCell.cardView"
+    view.accessibilityIdentifier = "CharlieTestCell.cardView"
     return view
   }()
 
@@ -207,7 +190,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     imageView.translatesAutoresizingMaskIntoConstraints = false
     imageView.contentMode = .scaleAspectFill
     imageView.image = UIImage(named: Constants.iconName)
-    imageView.accessibilityIdentifier = "AlphaTestCell.iconImageView"
+    imageView.accessibilityIdentifier = "CharlieTestCell.iconImageView"
 
     NSLayoutConstraint.activate([
       imageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
@@ -223,7 +206,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     label.textAlignment = .left
     label.numberOfLines = 0
     label.lineBreakMode = .byWordWrapping
-    label.accessibilityIdentifier = "AlphaTestCell.titleLabel"
+    label.accessibilityIdentifier = "CharlieTestCell.titleLabel"
     // Vertical: required so text pushes cell height
     label.setContentCompressionResistancePriority(.required, for: .vertical)
     // Horizontal: allow compression so text wraps when action section is visible
@@ -245,7 +228,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     button.layer.cornerRadius = Layout.screenWidth * 0.02
     button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
 
-    button.accessibilityIdentifier = "AlphaTestCell.actionButton"
+    button.accessibilityIdentifier = "CharlieTestCell.actionButton"
     button.setContentHuggingPriority(.required, for: .horizontal)
     button.setContentCompressionResistancePriority(.required, for: .horizontal)
     button.isHidden = true
@@ -258,7 +241,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     let imageView = UIImageView()
     imageView.translatesAutoresizingMaskIntoConstraints = false
     imageView.contentMode = .scaleAspectFit
-    imageView.accessibilityIdentifier = "AlphaTestCell.statusImageView"
+    imageView.accessibilityIdentifier = "CharlieTestCell.statusImageView"
     imageView.isHidden = true
     // Fixed size for status indicator
     NSLayoutConstraint.activate([
@@ -278,7 +261,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
       }
     indicator.translatesAutoresizingMaskIntoConstraints = false
     indicator.hidesWhenStopped = true
-    indicator.accessibilityIdentifier = "AlphaTestCell.loadingIndicator"
+    indicator.accessibilityIdentifier = "CharlieTestCell.loadingIndicator"
 
     // Fixed size to match status image
     NSLayoutConstraint.activate([
@@ -295,7 +278,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
     stack.alignment = .center
     stack.distribution = .fill
     stack.spacing = Layout.actionStackSpacing
-    stack.accessibilityIdentifier = "AlphaTestCell.actionStackView"
+    stack.accessibilityIdentifier = "CharlieTestCell.actionStackView"
     // High hugging so stack collapses when all children are hidden
     stack.setContentHuggingPriority(.required, for: .horizontal)
     stack.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -325,8 +308,6 @@ final class AlphaTestTableViewCell: UITableViewCell {
       statusImageView.isHidden = false
       statusImageView.image = UIImage(named: "failedImage")
     }
-
-    setNeedsLayout()
   }
 
   private func animateTitleChange() {
@@ -383,11 +364,8 @@ final class AlphaTestTableViewCell: UITableViewCell {
     return ceil(boundingRect.height)
   }
 
-  private func availableTitleWidth(
-    for state: ActionSectionState,
-    fallbackContentWidth: CGFloat? = nil,
-  ) -> CGFloat {
-    let contentWidth = contentView.bounds.width > 0 ? contentView.bounds.width : (fallbackContentWidth ?? 0)
+  private func availableTitleWidth(for state: ActionSectionState) -> CGFloat {
+    let contentWidth = contentView.bounds.width
     guard contentWidth > 0 else { return 0 }
 
     let cardWidth =
@@ -403,18 +381,6 @@ final class AlphaTestTableViewCell: UITableViewCell {
       actionContentWidth(for: state)
 
     return max(0, cardWidth - occupiedWidth)
-  }
-
-  private func updateTitlePreferredMaxLayoutWidth(fallbackContentWidth: CGFloat? = nil) {
-    let measuredLabelWidth = titleLabel.bounds.width
-    let resolvedWidth =
-      measuredLabelWidth > 0
-        ? measuredLabelWidth
-        : availableTitleWidth(for: currentActionSectionState, fallbackContentWidth: fallbackContentWidth)
-
-    guard resolvedWidth > 0 else { return }
-    guard abs(titleLabel.preferredMaxLayoutWidth - resolvedWidth) > 0.5 else { return }
-    titleLabel.preferredMaxLayoutWidth = resolvedWidth
   }
 
   private func actionContentWidth(for state: ActionSectionState) -> CGFloat {
@@ -471,9 +437,6 @@ final class AlphaTestTableViewCell: UITableViewCell {
     minHeightConstraint.priority = .defaultHigh
     minHeightConstraint.isActive = true
 
-    let titleCenterYConstraint = titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor)
-    titleCenterYConstraint.priority = .defaultHigh
-
     NSLayoutConstraint.activate([
       // 1. Base View (Container)
       baseView.leadingAnchor.constraint(
@@ -522,7 +485,7 @@ final class AlphaTestTableViewCell: UITableViewCell {
         lessThanOrEqualTo: cardView.bottomAnchor,
         constant: -Layout.thinPadding,
       ),
-      titleCenterYConstraint,
+      titleLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
 
       // 5. Icon Image View (Centered relative to Card -> Centered relative to Text)
       iconImageView.leadingAnchor.constraint(
