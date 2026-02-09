@@ -27,6 +27,29 @@ final class AlphaTestTableViewCell: UITableViewCell {
     case failed
   }
 
+  /// Customizable UI content for the cell.
+  struct Content {
+    var title: String
+    var iconImage: UIImage?
+    var retryButtonTitle: String
+    var successIndicatorImage: UIImage?
+    var failedIndicatorImage: UIImage?
+
+    init(
+      title: String,
+      iconImage: UIImage? = UIImage(named: "cpuImage"),
+      retryButtonTitle: String = "ULANGI",
+      successIndicatorImage: UIImage? = UIImage(named: "successImage"),
+      failedIndicatorImage: UIImage? = UIImage(named: "failedImage"),
+    ) {
+      self.title = title
+      self.iconImage = iconImage
+      self.retryButtonTitle = retryButtonTitle
+      self.successIndicatorImage = successIndicatorImage
+      self.failedIndicatorImage = failedIndicatorImage
+    }
+  }
+
   static let reuseIdentifier = "AlphaTestCell"
 
   /// Called when the ULANGI (retry) button is tapped
@@ -68,18 +91,34 @@ final class AlphaTestTableViewCell: UITableViewCell {
     onRetryButtonTapped = nil
     titleLabel.text = nil
     titleLabel.preferredMaxLayoutWidth = 0
+    iconImageView.image = UIImage(named: Constants.iconName)
+    actionButton.setTitle(Constants.actionButtonTitle, for: .normal)
+    successIndicatorImage = UIImage(named: "successImage")
+    failedIndicatorImage = UIImage(named: "failedImage")
+    statusImageView.image = nil
     currentActionSectionState = .hidden
     resetTransitionAppearance()
     applyActionSectionState(.hidden)
   }
 
-  func configure(title: String, animated: Bool = false) {
-    if animated, titleLabel.text != nil, titleLabel.text != title, window != nil {
+  func configure(content: Content, animated: Bool = false) {
+    if animated, titleLabel.text != nil, titleLabel.text != content.title, window != nil {
       animateTitleChange()
     }
-    titleLabel.text = title
+    // Clear stale wrapping width before applying new content.
+    titleLabel.preferredMaxLayoutWidth = 0
+    titleLabel.text = content.title
+    iconImageView.image = content.iconImage
+    actionButton.setTitle(content.retryButtonTitle, for: .normal)
+    successIndicatorImage = content.successIndicatorImage
+    failedIndicatorImage = content.failedIndicatorImage
     // Mark for layout recalculation on the next pass for reused cells.
     setNeedsLayout()
+  }
+
+  /// Convenience API for title-only updates.
+  func configure(title: String, animated: Bool = false) {
+    configure(content: Content(title: title), animated: animated)
   }
 
   func setActionSectionState(_ state: ActionSectionState, animated: Bool = false) {
@@ -165,6 +204,8 @@ final class AlphaTestTableViewCell: UITableViewCell {
   }
 
   private var currentActionSectionState = ActionSectionState.hidden
+  private var successIndicatorImage: UIImage? = UIImage(named: "successImage")
+  private var failedIndicatorImage: UIImage? = UIImage(named: "failedImage")
 
   private lazy var baseView: UIView = {
     let view = UIView()
@@ -318,14 +359,16 @@ final class AlphaTestTableViewCell: UITableViewCell {
 
     case .success:
       statusImageView.isHidden = false
-      statusImageView.image = UIImage(named: "successImage")
+      statusImageView.image = successIndicatorImage
 
     case .failed:
       actionButton.isHidden = false
       statusImageView.isHidden = false
-      statusImageView.image = UIImage(named: "failedImage")
+      statusImageView.image = failedIndicatorImage
     }
 
+    // Force a fresh wrap calculation for any action-area width change.
+    titleLabel.preferredMaxLayoutWidth = 0
     setNeedsLayout()
   }
 
@@ -387,13 +430,14 @@ final class AlphaTestTableViewCell: UITableViewCell {
     for state: ActionSectionState,
     fallbackContentWidth: CGFloat? = nil,
   ) -> CGFloat {
-    let contentWidth = contentView.bounds.width > 0 ? contentView.bounds.width : (fallbackContentWidth ?? 0)
-    guard contentWidth > 0 else { return 0 }
-
-    let cardWidth =
-      contentWidth -
-      (Layout.horizontalPadding * 2) -
-      (Layout.borderWidth * 2)
+    let cardWidth: CGFloat
+    if cardView.bounds.width > 0 {
+      cardWidth = cardView.bounds.width
+    } else {
+      let contentWidth = contentView.bounds.width > 0 ? contentView.bounds.width : (fallbackContentWidth ?? 0)
+      guard contentWidth > 0 else { return 0 }
+      cardWidth = contentWidth - (Layout.horizontalPadding * 2) - (Layout.borderWidth * 2)
+    }
 
     let occupiedWidth =
       Layout.iconLeadingPadding +
@@ -406,15 +450,14 @@ final class AlphaTestTableViewCell: UITableViewCell {
   }
 
   private func updateTitlePreferredMaxLayoutWidth(fallbackContentWidth: CGFloat? = nil) {
-    let measuredLabelWidth = titleLabel.bounds.width
-    let resolvedWidth =
-      measuredLabelWidth > 0
-        ? measuredLabelWidth
-        : availableTitleWidth(for: currentActionSectionState, fallbackContentWidth: fallbackContentWidth)
-
+    let resolvedWidth = availableTitleWidth(
+      for: currentActionSectionState,
+      fallbackContentWidth: fallbackContentWidth,
+    )
     guard resolvedWidth > 0 else { return }
-    guard abs(titleLabel.preferredMaxLayoutWidth - resolvedWidth) > 0.5 else { return }
-    titleLabel.preferredMaxLayoutWidth = resolvedWidth
+    let normalizedWidth = floor(resolvedWidth)
+    guard abs(titleLabel.preferredMaxLayoutWidth - normalizedWidth) > 0.5 else { return }
+    titleLabel.preferredMaxLayoutWidth = normalizedWidth
   }
 
   private func actionContentWidth(for state: ActionSectionState) -> CGFloat {
