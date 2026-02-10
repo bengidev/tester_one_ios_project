@@ -301,7 +301,7 @@ final class BetaTestViewController: UIViewController {
         constant: -Layout.buttonHorizontalInset,
       ),
       continueButtonShadowView.topAnchor.constraint(equalTo: bottomOverlayView.topAnchor, constant: Layout.bottomSectionTopInset),
-      continueButtonShadowView.heightAnchor.constraint(equalToConstant: Layout.buttonHeight),
+      continueButtonShadowView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.buttonHeight),
       continueButtonShadowView.bottomAnchor.constraint(
         equalTo: bottomOverlayView.safeAreaLayoutGuide.bottomAnchor,
         constant: -Layout.bottomSectionBottomInset,

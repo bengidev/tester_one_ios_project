@@ -346,7 +346,7 @@ final class DeviceTestViewController: UIViewController {
         equalTo: actionContainerView.bottomAnchor,
         constant: -Layout.actionVerticalInset,
       ),
-      actionButton.heightAnchor.constraint(equalToConstant: Layout.actionButtonHeight),
+      actionButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.actionButtonHeight),
     ])
   }
 
