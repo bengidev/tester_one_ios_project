@@ -37,38 +37,66 @@ final class DeviceTestViewController: UIViewController {
     static let estimatedRowHeight: CGFloat = 120
     static let tableContentInset = UIEdgeInsets(top: 16, left: 0, bottom: 16, right: 0)
 
-    static let navigationTitleColor = UIColor(
-      red: 0,
-      green: 102.0 / 255.0,
-      blue: 200.0 / 255.0,
-      alpha: 1,
-    )
-    static let tableBackgroundColor = UIColor(
-      red: 232.0 / 255.0,
-      green: 238.0 / 255.0,
-      blue: 241.0 / 255.0,
-      alpha: 1,
-    )
+    static var navigationTitleColor: UIColor {
+      if #available(iOS 13.0, *) {
+        .label
+      } else {
+        .black
+      }
+    }
+
+    static var tableBackgroundColor: UIColor {
+      if #available(iOS 13.0, *) {
+        .secondarySystemBackground
+      } else {
+        UIColor(
+          red: 232.0 / 255.0,
+          green: 238.0 / 255.0,
+          blue: 241.0 / 255.0,
+          alpha: 1,
+        )
+      }
+    }
 
     /// Bottom button colors
-    static let primaryBlue = UIColor(
-      red: 51.0 / 255.0,
-      green: 185.0 / 255.0,
-      blue: 255.0 / 255.0,
-      alpha: 1,
-    )
-    static let disabledBackground = UIColor(
-      red: 215.0 / 255.0,
-      green: 220.0 / 255.0,
-      blue: 222.0 / 255.0,
-      alpha: 1,
-    )
-    static let disabledTitle = UIColor(
-      red: 173.0 / 255.0,
-      green: 177.0 / 255.0,
-      blue: 178.0 / 255.0,
-      alpha: 1,
-    )
+    static var primaryBlue: UIColor {
+      if #available(iOS 13.0, *) {
+        .systemBlue
+      } else {
+        UIColor(
+          red: 51.0 / 255.0,
+          green: 185.0 / 255.0,
+          blue: 255.0 / 255.0,
+          alpha: 1,
+        )
+      }
+    }
+
+    static var disabledBackground: UIColor {
+      if #available(iOS 13.0, *) {
+        .tertiarySystemFill
+      } else {
+        UIColor(
+          red: 215.0 / 255.0,
+          green: 220.0 / 255.0,
+          blue: 222.0 / 255.0,
+          alpha: 1,
+        )
+      }
+    }
+
+    static var disabledTitle: UIColor {
+      if #available(iOS 13.0, *) {
+        .secondaryLabel
+      } else {
+        UIColor(
+          red: 173.0 / 255.0,
+          green: 177.0 / 255.0,
+          blue: 178.0 / 255.0,
+          alpha: 1,
+        )
+      }
+    }
   }
 
   private enum Layout {
@@ -116,38 +144,6 @@ final class DeviceTestViewController: UIViewController {
     var content: AlphaTestTableViewCell.Content
     var runPlan: TestRunPlan
     var actionState = AlphaTestTableViewCell.ActionSectionState.hidden
-  }
-
-  /// Builder used to keep test-item customization simple and centralized.
-  private static func makeTestItem(
-    title: String,
-    iconName: String = "cpuImage",
-    retryButtonTitle: String = "ULANGI",
-    successIndicatorName: String = "successImage",
-    failedIndicatorName: String = "failedImage",
-    initialProcedure: TestProcedure,
-    retryProcedure: TestProcedure? = nil,
-    loadingDuration: TimeInterval = 1.2,
-    successState: AlphaTestTableViewCell.ActionSectionState = .success,
-    failureState: AlphaTestTableViewCell.ActionSectionState = .failed,
-  ) -> TestItem {
-    let content = AlphaTestTableViewCell.Content(
-      title: title,
-      iconImage: UIImage(named: iconName),
-      retryButtonTitle: retryButtonTitle,
-      successIndicatorImage: UIImage(named: successIndicatorName),
-      failedIndicatorImage: UIImage(named: failedIndicatorName),
-    )
-
-    let runPlan = TestRunPlan(
-      loadingDuration: loadingDuration,
-      initialProcedure: initialProcedure,
-      retryProcedure: retryProcedure ?? initialProcedure,
-      successState: successState,
-      failureState: failureState,
-    )
-
-    return TestItem(content: content, runPlan: runPlan)
   }
 
   private var testItems: [TestItem] = [
@@ -240,11 +236,45 @@ final class DeviceTestViewController: UIViewController {
   private lazy var actionButton: UIButton = {
     let button = UIButton(type: .system)
     button.translatesAutoresizingMaskIntoConstraints = false
-    button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+    let baseFont = UIFont.systemFont(ofSize: 16, weight: .semibold)
+    button.titleLabel?.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: baseFont)
+    button.titleLabel?.adjustsFontForContentSizeCategory = true
     button.layer.cornerRadius = Layout.actionButtonCornerRadius
     button.clipsToBounds = true
     return button
   }()
+
+  /// Builder used to keep test-item customization simple and centralized.
+  private static func makeTestItem(
+    title: String,
+    iconName: String = "cpuImage",
+    retryButtonTitle: String = "ULANGI",
+    successIndicatorName: String = "successImage",
+    failedIndicatorName: String = "failedImage",
+    initialProcedure: TestProcedure,
+    retryProcedure: TestProcedure? = nil,
+    loadingDuration: TimeInterval = 1.2,
+    successState: AlphaTestTableViewCell.ActionSectionState = .success,
+    failureState: AlphaTestTableViewCell.ActionSectionState = .failed,
+  ) -> TestItem {
+    let content = AlphaTestTableViewCell.Content(
+      title: title,
+      iconImage: UIImage(named: iconName),
+      retryButtonTitle: retryButtonTitle,
+      successIndicatorImage: UIImage(named: successIndicatorName),
+      failedIndicatorImage: UIImage(named: failedIndicatorName),
+    )
+
+    let runPlan = TestRunPlan(
+      loadingDuration: loadingDuration,
+      initialProcedure: initialProcedure,
+      retryProcedure: retryProcedure ?? initialProcedure,
+      successState: successState,
+      failureState: failureState,
+    )
+
+    return TestItem(content: content, runPlan: runPlan)
+  }
 
   private func setupViewController() {
     setupAppearance()
@@ -473,15 +503,15 @@ final class DeviceTestViewController: UIViewController {
 
     setTestState(.loading, at: indexPath, animated: true) { [weak self] in
       guard let self else { return }
-      guard self.activeSequenceID == sequenceID else { return }
+      guard activeSequenceID == sequenceID else { return }
 
-      self.executeRunPlan(forRow: row, phase: .initial) { [weak self] resultState in
+      executeRunPlan(forRow: row, phase: .initial) { [weak self] resultState in
         guard let self else { return }
-        guard self.activeSequenceID == sequenceID else { return }
+        guard activeSequenceID == sequenceID else { return }
 
-        self.setTestState(resultState, at: indexPath, animated: true) { [weak self] in
+        setTestState(resultState, at: indexPath, animated: true) { [weak self] in
           guard let self else { return }
-          guard self.activeSequenceID == sequenceID else { return }
+          guard activeSequenceID == sequenceID else { return }
           next()
         }
       }
@@ -508,12 +538,12 @@ final class DeviceTestViewController: UIViewController {
 
     setTestState(.loading, at: indexPath, animated: true) { [weak self] in
       guard let self else { return }
-      guard self.activeRetryIDs[row] == retryID else { return }
+      guard activeRetryIDs[row] == retryID else { return }
 
-      self.executeRunPlan(forRow: row, phase: .retry) { [weak self] retryState in
+      executeRunPlan(forRow: row, phase: .retry) { [weak self] retryState in
         guard let self else { return }
-        guard self.activeRetryIDs[row] == retryID else { return }
-        self.setTestState(retryState, at: indexPath, animated: true)
+        guard activeRetryIDs[row] == retryID else { return }
+        setTestState(retryState, at: indexPath, animated: true)
       }
     }
   }
@@ -579,8 +609,6 @@ final class DeviceTestViewController: UIViewController {
       runMockTouchscreenTest(completion: completion)
     }
   }
-
-  // MARK: Mock Procedures (Reference Implementation)
 
   private func runMockSimCardTest(completion: @escaping (Bool) -> Void) {
     simulateMockProcedure(delay: 0.35, success: true, completion: completion)
