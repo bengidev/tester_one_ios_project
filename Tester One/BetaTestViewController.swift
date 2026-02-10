@@ -521,9 +521,9 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
         static let contentInset: CGFloat = 15
         static let iconCircleSize: CGFloat = 40
         static let iconSize: CGFloat = 22
-        static let statusSize: CGFloat = 24
+        static let statusSize: CGFloat = 28
         static let topRowSpacing: CGFloat = 10
-        static let retryHeight: CGFloat = 26
+        static let retryHeight: CGFloat = 30
     }
 
     private lazy var cardView: UIView = {
@@ -566,6 +566,9 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
         indicator.translatesAutoresizingMaskIntoConstraints = false
         indicator.hidesWhenStopped = true
         indicator.color = UIColor.fonezyDisabledIcon
+        let baseIndicatorSize: CGFloat = 20
+        let scale = Layout.statusSize / baseIndicatorSize
+        indicator.transform = CGAffineTransform(scaleX: scale, y: scale)
         return indicator
     }()
 
@@ -574,12 +577,12 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setTitle("Ulangi", for: .normal)
         button.setTitleColor(.black, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.92)
         button.layer.cornerRadius = Layout.retryHeight / 2
         button.layer.borderWidth = 1
         button.layer.borderColor = UIColor.fonezyDarkGray.cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 2, left: 10, bottom: 2, right: 10)
+        button.contentEdgeInsets = UIEdgeInsets(top: 3, left: 12, bottom: 3, right: 12)
         button.isUserInteractionEnabled = true
         button.addTarget(self, action: #selector(handleRetryButtonTap), for: .touchUpInside)
         button.isHidden = true
