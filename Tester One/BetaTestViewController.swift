@@ -18,6 +18,12 @@ import UIKit
 final class BetaTestViewController: UIViewController {
     // MARK: Internal
 
+    enum ContinueButtonState {
+        case start
+        case loading
+        case finish
+    }
+
     struct ProcessResult {
         let index: Int
         let title: String
@@ -44,17 +50,11 @@ final class BetaTestViewController: UIViewController {
     /// Optional callback invoked when a single retry completes.
     var onRetryCompleted: ((ProcessResult) -> Void)?
 
-    /// Customize continue button title.
-    var continueButtonTitle = "Lanjut" {
-        didSet {
-            continueButton.setTitle(continueButtonTitle, for: .normal)
-        }
-    }
-
     /// Starts loading -> result transition for all cards.
     func beginProcessing() {
         guard !isProcessing else { return }
         isProcessing = true
+        setContinueButtonState(.loading)
         updateAllItemStates(.loading)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
@@ -70,6 +70,7 @@ final class BetaTestViewController: UIViewController {
 
             isProcessing = false
             collectionView.reloadData()
+            setContinueButtonState(.finish)
             onProcessCompleted?(results)
         }
     }
@@ -92,7 +93,7 @@ final class BetaTestViewController: UIViewController {
         setupViewHierarchy()
         setupConstraints()
         updateCollectionLayoutIfNeeded()
-        continueButton.setTitle(continueButtonTitle, for: .normal)
+        setContinueButtonState(.start)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -128,6 +129,7 @@ final class BetaTestViewController: UIViewController {
     private var items = BetaTestViewController.defaultItems()
     private var isProcessing = false
     private var retryingIndices = Set<Int>()
+    private var continueButtonState: ContinueButtonState = .start
 
     private var lastCollectionWidth: CGFloat = 0
 
@@ -299,8 +301,15 @@ final class BetaTestViewController: UIViewController {
 
     @objc
     private func handleContinueTap() {
-        onContinueButtonTapped?()
-        beginProcessing()
+        switch continueButtonState {
+        case .start:
+            onContinueButtonTapped?()
+            beginProcessing()
+        case .loading:
+            return
+        case .finish:
+            onContinueButtonTapped?()
+        }
     }
 
     private func updateAllItemStates(_ state: BetaTestCardState) {
@@ -308,6 +317,28 @@ final class BetaTestViewController: UIViewController {
             items[index].state = state
         }
         collectionView.reloadData()
+    }
+
+    private func setContinueButtonState(_ state: ContinueButtonState) {
+        continueButtonState = state
+
+        switch state {
+        case .start:
+            continueButton.setTitle("Mulai Tes", for: .normal)
+            continueButton.setTitleColor(.white, for: .normal)
+            continueButton.backgroundColor = .fonezyHeaderGreen
+            continueButton.isEnabled = true
+        case .loading:
+            continueButton.setTitle("Dalam Pengecekan", for: .normal)
+            continueButton.setTitleColor(.fonezyLoadingText, for: .normal)
+            continueButton.backgroundColor = .fonezyLoadingBackground
+            continueButton.isEnabled = false
+        case .finish:
+            continueButton.setTitle("Lanjut", for: .normal)
+            continueButton.setTitleColor(.white, for: .normal)
+            continueButton.backgroundColor = .fonezyHeaderGreen
+            continueButton.isEnabled = true
+        }
     }
 
     private func handleRetryTap(at index: Int) {
@@ -744,6 +775,8 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
 
 private extension UIColor {
     static let fonezyHeaderGreen = UIColor(red: 54.0 / 255.0, green: 132.0 / 255.0, blue: 3.0 / 255.0, alpha: 1)
+    static let fonezyLoadingText = UIColor(red: 173.0 / 255.0, green: 177.0 / 255.0, blue: 178.0 / 255.0, alpha: 1) // #ADB1B2
+    static let fonezyLoadingBackground = UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1) // #D7DCDE
     static let fonezySapGreen = UIColor(red: 74.0 / 255.0, green: 144.0 / 255.0, blue: 28.0 / 255.0, alpha: 1)
     static let fonezyLabelGreen = UIColor(red: 54.0 / 255.0, green: 132.0 / 255.0, blue: 3.0 / 255.0, alpha: 1)
     static let fonezyStatusGreen = UIColor(red: 76.0 / 255.0, green: 153.0 / 255.0, blue: 31.0 / 255.0, alpha: 1)
