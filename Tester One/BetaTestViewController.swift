@@ -70,7 +70,7 @@ final class BetaTestViewController: UIViewController {
 
       for index in items.indices {
         let title = items[index].title
-        let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index, title: title)
+        let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
         items[index].state = resolvedState
         results.append(ProcessResult(index: index, title: title, state: resolvedState))
       }
@@ -96,7 +96,7 @@ final class BetaTestViewController: UIViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    setupNavigationBar()
+    configureNavigationBarAppearance()
     setupViewHierarchy()
     setupConstraints()
     setContinueButtonState(.start)
@@ -104,7 +104,6 @@ final class BetaTestViewController: UIViewController {
 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
-    setupNavigationBar()
     navigationController?.setNavigationBarHidden(false, animated: animated)
   }
 
@@ -269,7 +268,7 @@ final class BetaTestViewController: UIViewController {
     continueButtonShadowView.addSubview(continueButton)
   }
 
-  private func setupNavigationBar() {
+  private func configureNavigationBarAppearance() {
     title = "Cek Fungsi"
     navigationItem.largeTitleDisplayMode = .never
 
@@ -427,7 +426,7 @@ final class BetaTestViewController: UIViewController {
       guard retryRunIDs[index] == retryRunID else { return }
       guard items.indices.contains(index) else { return }
 
-      let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index, title: title)
+      let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
       items[index].state = resolvedState
       retryingIndices.remove(index)
       retryRunIDs[index] = nil
@@ -437,7 +436,7 @@ final class BetaTestViewController: UIViewController {
     }
   }
 
-  private func defaultFinalState(for index: Int, title _: String) -> BetaTestCardState {
+  private func defaultFinalState(for index: Int) -> BetaTestCardState {
     // Keep current behavior: only "Tombol Silent" card (index 6 in default dataset) fails by default.
     return index == 6 ? .failed : .success
   }
@@ -753,6 +752,21 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
     return label
   }()
 
+  private static let fallbackAssetNamesByIcon: [BetaTestItem.IconType: [String]] = [
+    .cpu: ["cpuImage", "failedImage"],
+    .hardDisk: ["hardDiskImage", "storageImage", "cpuImage", "failedImage"],
+    .battery: ["batteryImage", "cpuImage", "failedImage"],
+    .jailbreak: ["securityImage", "cpuImage", "failedImage"],
+    .biometricOne: ["faceIDImage", "biometricImage", "cpuImage", "failedImage"],
+    .biometricTwo: ["touchIDImage", "biometricImage", "cpuImage", "failedImage"],
+    .silent: ["silentImage", "audioImage", "cpuImage", "failedImage"],
+    .volume: ["volumeImage", "audioImage", "cpuImage", "failedImage"],
+    .power: ["powerImage", "cpuImage", "failedImage"],
+    .camera: ["cameraImage", "cpuImage", "failedImage"],
+    .touch: ["touchImage", "screenImage", "cpuImage", "failedImage"],
+    .sim: ["simImage", "networkImage", "cpuImage", "failedImage"],
+  ]
+
   private static func successStatusImage() -> UIImage? {
     if let image = UIImage(named: "successImage") {
       return image.withRenderingMode(.alwaysOriginal)
@@ -921,32 +935,7 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
   }
 
   private func fallbackAssetNames(for icon: BetaTestItem.IconType) -> [String] {
-    switch icon {
-    case .cpu:
-      return ["cpuImage", "failedImage"]
-    case .hardDisk:
-      return ["hardDiskImage", "storageImage", "cpuImage", "failedImage"]
-    case .battery:
-      return ["batteryImage", "cpuImage", "failedImage"]
-    case .jailbreak:
-      return ["securityImage", "cpuImage", "failedImage"]
-    case .biometricOne:
-      return ["faceIDImage", "biometricImage", "cpuImage", "failedImage"]
-    case .biometricTwo:
-      return ["touchIDImage", "biometricImage", "cpuImage", "failedImage"]
-    case .silent:
-      return ["silentImage", "audioImage", "cpuImage", "failedImage"]
-    case .volume:
-      return ["volumeImage", "audioImage", "cpuImage", "failedImage"]
-    case .power:
-      return ["powerImage", "cpuImage", "failedImage"]
-    case .camera:
-      return ["cameraImage", "cpuImage", "failedImage"]
-    case .touch:
-      return ["touchImage", "screenImage", "cpuImage", "failedImage"]
-    case .sim:
-      return ["simImage", "networkImage", "cpuImage", "failedImage"]
-    }
+    Self.fallbackAssetNamesByIcon[icon] ?? ["cpuImage", "failedImage"]
   }
 
   private func systemSymbolName(for icon: BetaTestItem.IconType) -> String {
