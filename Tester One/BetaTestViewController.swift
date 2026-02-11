@@ -71,7 +71,7 @@ final class BetaTestViewController: UIViewController {
       for index in items.indices {
         let title = items[index].title
         let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
-        items[index].state = resolvedState
+        setItemState(resolvedState, at: index, reload: false)
         results.append(ProcessResult(index: index, title: title, state: resolvedState))
       }
 
@@ -84,9 +84,7 @@ final class BetaTestViewController: UIViewController {
 
   /// Manually set a single card state (useful for external action chains).
   func setState(_ state: BetaTestCardState, at index: Int) {
-    guard items.indices.contains(index) else { return }
-    items[index].state = state
-    collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+    setItemState(state, at: index, reload: true)
   }
 
   /// Manually set all card states.
@@ -373,9 +371,17 @@ final class BetaTestViewController: UIViewController {
 
   private func updateAllItemStates(_ state: BetaTestCardState) {
     for index in items.indices {
-      items[index].state = state
+      setItemState(state, at: index, reload: false)
     }
     reloadAllItems()
+  }
+
+  private func setItemState(_ state: BetaTestCardState, at index: Int, reload: Bool) {
+    guard items.indices.contains(index) else { return }
+    items[index].state = state
+
+    guard reload else { return }
+    collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
   }
 
   private func reloadAllItems() {
@@ -418,8 +424,7 @@ final class BetaTestViewController: UIViewController {
     let retryRunID = UUID()
     retryRunIDs[index] = retryRunID
     retryingIndices.insert(index)
-    items[index].state = .loading
-    collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+    setItemState(.loading, at: index, reload: true)
 
     DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
       guard let self else { return }
@@ -427,10 +432,9 @@ final class BetaTestViewController: UIViewController {
       guard items.indices.contains(index) else { return }
 
       let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
-      items[index].state = resolvedState
+      setItemState(resolvedState, at: index, reload: true)
       retryingIndices.remove(index)
       retryRunIDs[index] = nil
-      collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
 
       onRetryCompleted?(ProcessResult(index: index, title: title, state: resolvedState))
     }
