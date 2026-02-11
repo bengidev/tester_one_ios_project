@@ -70,7 +70,7 @@ final class BetaTestViewController: UIViewController {
       }
 
       isProcessing = false
-      collectionView.reloadData()
+      reloadAllItems()
       setContinueButtonState(.finish)
       onProcessCompleted?(results)
     }
@@ -106,6 +106,7 @@ final class BetaTestViewController: UIViewController {
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     updateCollectionLayoutIfNeeded()
+    updateContinueButtonShadowPathIfNeeded()
   }
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -145,6 +146,7 @@ final class BetaTestViewController: UIViewController {
   private var continueButtonState = ContinueButtonState.start
 
   private var lastCollectionWidth: CGFloat = 0
+  private var lastContinueButtonShadowBounds = CGRect.zero
   private var cachedRowMeasurements: (
     width: CGFloat,
     contentSizeCategory: UIContentSizeCategory,
@@ -337,6 +339,18 @@ final class BetaTestViewController: UIViewController {
     collectionView.collectionViewLayout.invalidateLayout()
   }
 
+  private func updateContinueButtonShadowPathIfNeeded() {
+    let bounds = continueButtonShadowView.bounds
+    guard bounds.width > 0, bounds.height > 0 else { return }
+    guard bounds != lastContinueButtonShadowBounds else { return }
+
+    lastContinueButtonShadowBounds = bounds
+    continueButtonShadowView.layer.shadowPath = UIBezierPath(
+      roundedRect: bounds,
+      cornerRadius: Layout.buttonCornerRadius,
+    ).cgPath
+  }
+
   @objc
   private func handleContinueTap() {
     switch continueButtonState {
@@ -356,7 +370,16 @@ final class BetaTestViewController: UIViewController {
     for index in items.indices {
       items[index].state = state
     }
-    collectionView.reloadData()
+    reloadAllItems()
+  }
+
+  private func reloadAllItems() {
+    let indexPaths = items.indices.map { IndexPath(item: $0, section: 0) }
+    guard !indexPaths.isEmpty else { return }
+
+    collectionView.performBatchUpdates({
+      collectionView.reloadItems(at: indexPaths)
+    })
   }
 
   private func setContinueButtonState(_ state: ContinueButtonState) {
