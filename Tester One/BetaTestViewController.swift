@@ -98,7 +98,6 @@ final class BetaTestViewController: UIViewController {
     setupNavigationBar()
     setupViewHierarchy()
     setupConstraints()
-    updateCollectionLayoutIfNeeded()
     setContinueButtonState(.start)
   }
 
@@ -381,12 +380,8 @@ final class BetaTestViewController: UIViewController {
   }
 
   private func reloadAllItems() {
-    let indexPaths = items.indices.map { IndexPath(item: $0, section: 0) }
-    guard !indexPaths.isEmpty else { return }
-
-    collectionView.performBatchUpdates({
-      collectionView.reloadItems(at: indexPaths)
-    })
+    guard !items.isEmpty else { return }
+    collectionView.reloadData()
   }
 
   private func setContinueButtonState(_ state: ContinueButtonState) {
