@@ -51,6 +51,10 @@ final class BetaTestViewController: UIViewController {
   /// Optional callback invoked when a single retry completes.
   var onRetryCompleted: ((ProcessResult) -> Void)?
 
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
   /// Starts loading -> result transition for all cards.
   func beginProcessing() {
     guard runPhase != .processing else { return }
@@ -282,10 +286,6 @@ final class BetaTestViewController: UIViewController {
     view.accessibilityIdentifier = "BetaTestViewController.continueButtonShadowView"
     return view
   }()
-
-  deinit {
-    NotificationCenter.default.removeObserver(self)
-  }
 
   private static func defaultItems() -> [BetaTestItem] {
     [
@@ -590,59 +590,6 @@ extension BetaTestViewController {
 
     return measuredHeights.last ?? 0
   }
-}
-
-// MARK: - BetaTestItem
-
-struct BetaTestItem {
-
-  // MARK: Internal
-
-  enum IconType: CaseIterable {
-    case cpu
-    case hardDisk
-    case battery
-    case jailbreak
-    case biometricOne
-    case biometricTwo
-    case silent
-    case volume
-    case power
-    case camera
-    case touch
-    case sim
-  }
-
-  let title: String
-  let icon: IconType
-  let accessibilityToken: String
-  var state: BetaTestCardState
-
-  init(title: String, icon: IconType, state: BetaTestCardState) {
-    self.title = title
-    self.icon = icon
-    self.state = state
-    accessibilityToken = Self.makeAccessibilityToken(from: title)
-  }
-
-  // MARK: Private
-
-  private static func makeAccessibilityToken(from title: String) -> String {
-    let normalized = String(title.lowercased().map { character in
-      character.isLetter || character.isNumber ? character : "_"
-    })
-    let collapsed = normalized.replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
-    return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
-  }
-}
-
-// MARK: - BetaTestCardState
-
-enum BetaTestCardState: Equatable {
-  case initial
-  case loading
-  case success
-  case failed
 }
 
 // MARK: - BetaTestCollectionViewCell
