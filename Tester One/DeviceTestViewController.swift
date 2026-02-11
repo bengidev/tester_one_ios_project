@@ -208,6 +208,7 @@ final class DeviceTestViewController: UIViewController {
   private var activeRetryIDs = [Int: UUID]()
   private var hasLoggedDequeuedCellClass = false
   private var lastKnownTableWidth: CGFloat = 0
+  private var lastKnownSpacerWidth: CGFloat = 0
 
   private lazy var fullScreenView: UIView = {
     let view = UIView()
@@ -665,18 +666,25 @@ final class DeviceTestViewController: UIViewController {
   }
 
   private func updateTableSpacerViews() {
-    guard tableView.bounds.width > 0 else { return }
+    let currentWidth = tableView.bounds.width
+    guard currentWidth > 0 else { return }
+    guard abs(currentWidth - lastKnownSpacerWidth) > 0.5 else { return }
+    lastKnownSpacerWidth = currentWidth
 
     if let header = tableView.tableHeaderView {
       let height = header.frame.height
-      header.frame = CGRect(x: 0, y: 0, width: tableView.bounds.width, height: height)
-      tableView.tableHeaderView = header
+      if abs(header.frame.width - currentWidth) > 0.5 {
+        header.frame = CGRect(x: 0, y: 0, width: currentWidth, height: height)
+        tableView.tableHeaderView = header
+      }
     }
 
     if let footer = tableView.tableFooterView {
       let height = footer.frame.height
-      footer.frame = CGRect(x: 0, y: 0, width: tableView.bounds.width, height: height)
-      tableView.tableFooterView = footer
+      if abs(footer.frame.width - currentWidth) > 0.5 {
+        footer.frame = CGRect(x: 0, y: 0, width: currentWidth, height: height)
+        tableView.tableFooterView = footer
+      }
     }
   }
 

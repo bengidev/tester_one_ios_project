@@ -108,6 +108,18 @@ final class BetaTestViewController: UIViewController {
     updateCollectionLayoutIfNeeded()
   }
 
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+
+    guard
+      previousTraitCollection?.preferredContentSizeCategory
+      != traitCollection.preferredContentSizeCategory
+    else { return }
+
+    cachedRowMeasurements = nil
+    collectionView.collectionViewLayout.invalidateLayout()
+  }
+
   // MARK: Private
 
   private enum Layout {
@@ -119,10 +131,6 @@ final class BetaTestViewController: UIViewController {
     static let gridInterItemSpacing: CGFloat = 12
     static let gridLineSpacing: CGFloat = 12
     static let cardsPerRow = 2
-    static let compactWidthThreshold: CGFloat = 350
-    static let compactCardAspectRatio: CGFloat = 0.80
-    static let regularCardAspectRatio: CGFloat = 0.70
-    static let minimumCardHeight: CGFloat = 110
 
     static let bottomSectionTopInset: CGFloat = 16
     static let bottomSectionBottomInset: CGFloat = 16
@@ -137,6 +145,11 @@ final class BetaTestViewController: UIViewController {
   private var continueButtonState = ContinueButtonState.start
 
   private var lastCollectionWidth: CGFloat = 0
+  private var cachedRowMeasurements: (
+    width: CGFloat,
+    contentSizeCategory: UIContentSizeCategory,
+    heightsByRow: [CGFloat],
+  )?
 
   private lazy var collectionLayout: UICollectionViewFlowLayout = {
     let layout = UICollectionViewFlowLayout()
@@ -319,6 +332,7 @@ final class BetaTestViewController: UIViewController {
     guard collectionWidth > 0 else { return }
     guard abs(collectionWidth - lastCollectionWidth) > 0.5 else { return }
     lastCollectionWidth = collectionWidth
+    cachedRowMeasurements = nil
 
     collectionView.collectionViewLayout.invalidateLayout()
   }
@@ -436,7 +450,7 @@ extension BetaTestViewController: UICollectionViewDelegateFlowLayout {
   func collectionView(
     _ collectionView: UICollectionView,
     layout _: UICollectionViewLayout,
-    sizeForItemAt _: IndexPath,
+    sizeForItemAt indexPath: IndexPath,
   ) -> CGSize {
     let sectionInsets = collectionLayout.sectionInset
     let horizontalInsets = sectionInsets.left + sectionInsets.right
@@ -447,14 +461,41 @@ extension BetaTestViewController: UICollectionViewDelegateFlowLayout {
     let itemWidth = floor((contentWidth - totalSpacing) / CGFloat(Layout.cardsPerRow))
     guard itemWidth > 0 else { return .zero }
 
-    let aspectRatio =
-      if collectionView.bounds.width <= Layout.compactWidthThreshold {
-        Layout.compactCardAspectRatio
-      } else {
-        Layout.regularCardAspectRatio
-      }
-    let itemHeight = max(floor(itemWidth * aspectRatio), Layout.minimumCardHeight)
+    let itemHeight = adaptiveCardHeight(for: itemWidth, at: indexPath.item)
     return CGSize(width: itemWidth, height: itemHeight)
+  }
+}
+
+extension BetaTestViewController {
+  private func adaptiveCardHeight(for itemWidth: CGFloat, at itemIndex: Int) -> CGFloat {
+    let contentSizeCategory = traitCollection.preferredContentSizeCategory
+    let rowIndex = max(0, itemIndex / Layout.cardsPerRow)
+    if
+      let cachedRowMeasurements,
+      abs(cachedRowMeasurements.width - itemWidth) < 0.5,
+      cachedRowMeasurements.contentSizeCategory == contentSizeCategory,
+      rowIndex < cachedRowMeasurements.heightsByRow.count
+    {
+      return cachedRowMeasurements.heightsByRow[rowIndex]
+    }
+
+    let measuredHeights = BetaTestCollectionViewCell.preferredHeightsByRow(
+      for: itemWidth,
+      titles: items.map(\.title),
+      itemsPerRow: Layout.cardsPerRow,
+      traitCollection: traitCollection,
+    )
+    cachedRowMeasurements = (
+      width: itemWidth,
+      contentSizeCategory: contentSizeCategory,
+      heightsByRow: measuredHeights,
+    )
+
+    if rowIndex < measuredHeights.count {
+      return measuredHeights[rowIndex]
+    }
+
+    return measuredHeights.last ?? 0
   }
 }
 
@@ -510,6 +551,47 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
     fatalError("init(coder:) has not been implemented")
   }
 
+  static func preferredHeightsByRow(
+    for itemWidth: CGFloat,
+    titles: [String],
+    itemsPerRow: Int,
+    traitCollection: UITraitCollection,
+  ) -> [CGFloat] {
+    guard itemWidth > 0 else { return [] }
+    guard itemsPerRow > 0 else { return [] }
+
+    let titleWidth = max(itemWidth - (Layout.contentInset * 2), 1)
+    let baseFont = UIFont.systemFont(ofSize: 16, weight: .medium)
+    let titleFont: UIFont =
+      if #available(iOS 11.0, *) {
+        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont, compatibleWith: traitCollection)
+      } else {
+        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
+      }
+
+    let bottomInset = Layout.titleBottomInset
+    let semanticBottomSpacing = semanticCardBottomSpacing(for: titleFont)
+    var rowHeights = [CGFloat]()
+    var startIndex = 0
+
+    while startIndex < titles.count {
+      let endIndex = min(startIndex + itemsPerRow, titles.count)
+      let rowTitles = Array(titles[startIndex ..< endIndex])
+      let maximumTitleHeight = maxTitleHeight(for: rowTitles, width: titleWidth, font: titleFont)
+      let cardHeight =
+        Layout.contentInset
+          + Layout.iconCircleSize
+          + Layout.topRowSpacing
+          + maximumTitleHeight
+          + bottomInset
+          + semanticBottomSpacing
+      rowHeights.append(ceil(cardHeight))
+      startIndex = endIndex
+    }
+
+    return rowHeights
+  }
+
   override func prepareForReuse() {
     super.prepareForReuse()
     iconImageView.image = nil
@@ -543,10 +625,11 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
     static let cornerRadius: CGFloat = 20
     static let cardInset: CGFloat = 0
     static let contentInset: CGFloat = 15
+    static let titleBottomInset: CGFloat = 15
     static let iconCircleSize: CGFloat = 50
     static let iconSize: CGFloat = 25
     static let statusSize: CGFloat = 30
-    static let topRowSpacing: CGFloat = 12
+    static let topRowSpacing: CGFloat = 20
     static let retryHeight: CGFloat = 30
   }
 
@@ -650,6 +733,29 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
     return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
   }
 
+  private static func maxTitleHeight(for titles: [String], width: CGFloat, font: UIFont) -> CGFloat {
+    guard width > 0 else { return ceil(font.lineHeight) }
+
+    let attributes: [NSAttributedString.Key: Any] = [.font: font]
+    let options: NSStringDrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+    let constraint = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+
+    return titles.reduce(ceil(font.lineHeight)) { currentMax, title in
+      let measured = (title as NSString).boundingRect(
+        with: constraint,
+        options: options,
+        attributes: attributes,
+        context: nil,
+      )
+      return max(currentMax, ceil(measured.height))
+    }
+  }
+
+  private static func semanticCardBottomSpacing(for titleFont: UIFont) -> CGFloat {
+    let proportionalSpacing = ceil(titleFont.lineHeight * 0.20)
+    return min(max(proportionalSpacing, 2), 10)
+  }
+
   private func setupCell() {
     contentView.backgroundColor = .clear
     backgroundColor = .clear
@@ -695,7 +801,7 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
       titleLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: Layout.contentInset),
       titleLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -Layout.contentInset),
       titleLabel.topAnchor.constraint(equalTo: iconCircleView.bottomAnchor, constant: Layout.topRowSpacing),
-      titleLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -Layout.contentInset / 3),
+      titleLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -Layout.titleBottomInset),
     ])
   }
 
