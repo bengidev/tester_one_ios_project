@@ -58,6 +58,7 @@ final class BetaTestViewController: UIViewController {
     processRunID = UUID()
     let runID = processRunID
     retryRunIDs.removeAll()
+    retryingIndices.removeAll()
     setContinueButtonState(.loading)
     updateAllItemStates(.loading)
 
