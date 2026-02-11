@@ -55,11 +55,16 @@ final class BetaTestViewController: UIViewController {
   func beginProcessing() {
     guard !isProcessing else { return }
     isProcessing = true
+    processRunID = UUID()
+    let runID = processRunID
+    retryRunIDs.removeAll()
     setContinueButtonState(.loading)
     updateAllItemStates(.loading)
 
     DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
       guard let self else { return }
+      guard processRunID == runID else { return }
+
       var results = [ProcessResult]()
 
       for index in items.indices {
@@ -142,7 +147,9 @@ final class BetaTestViewController: UIViewController {
 
   private var items = BetaTestViewController.defaultItems()
   private var isProcessing = false
+  private var processRunID = UUID()
   private var retryingIndices = Set<Int>()
+  private var retryRunIDs = [Int: UUID]()
   private var continueButtonState = ContinueButtonState.start
 
   private var lastCollectionWidth: CGFloat = 0
@@ -414,27 +421,29 @@ final class BetaTestViewController: UIViewController {
     let title = items[index].title
     onRetryButtonTapped?(index, title)
 
+    let retryRunID = UUID()
+    retryRunIDs[index] = retryRunID
     retryingIndices.insert(index)
     items[index].state = .loading
     collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
 
     DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
       guard let self else { return }
+      guard retryRunIDs[index] == retryRunID else { return }
       guard items.indices.contains(index) else { return }
 
       let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index, title: title)
       items[index].state = resolvedState
       retryingIndices.remove(index)
+      retryRunIDs[index] = nil
       collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
 
       onRetryCompleted?(ProcessResult(index: index, title: title, state: resolvedState))
     }
   }
 
-  private func defaultFinalState(for index: Int, title: String) -> BetaTestCardState {
-    if title == "Tombol Silent" {
-      return .failed
-    }
+  private func defaultFinalState(for index: Int, title _: String) -> BetaTestCardState {
+    // Keep current behavior: only "Tombol Silent" card (index 6 in default dataset) fails by default.
     return index == 6 ? .failed : .success
   }
 
