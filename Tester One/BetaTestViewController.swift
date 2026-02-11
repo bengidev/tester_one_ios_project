@@ -19,16 +19,16 @@ final class BetaTestViewController: UIViewController {
 
   // MARK: Internal
 
-  enum ContinueButtonState {
-    case start
-    case loading
-    case finish
-  }
-
   struct ProcessResult {
     let index: Int
     let title: String
     let state: BetaTestCardState
+  }
+
+  enum RunPhase: Equatable {
+    case idle
+    case processing
+    case finished
   }
 
   typealias StateResolver = (_ index: Int, _ title: String) -> BetaTestCardState
@@ -53,17 +53,15 @@ final class BetaTestViewController: UIViewController {
 
   /// Starts loading -> result transition for all cards.
   func beginProcessing() {
-    guard !isProcessing else { return }
-    isProcessing = true
-    processRunID = UUID()
-    let runID = processRunID
-    retryRunIDs.removeAll()
-    setContinueButtonState(.loading)
+    guard runPhase != .processing else { return }
+
+    let runID = runCoordinator.beginProcessingRun()
+    setRunPhase(.processing)
     updateAllItemStates(.loading)
 
     DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
       guard let self else { return }
-      guard processRunID == runID else { return }
+      guard runCoordinator.isProcessingRunActive(runID) else { return }
 
       var results = [ProcessResult]()
 
@@ -74,9 +72,8 @@ final class BetaTestViewController: UIViewController {
         results.append(ProcessResult(index: index, title: title, state: resolvedState))
       }
 
-      isProcessing = false
       reloadAllItems()
-      setContinueButtonState(.finish)
+      setRunPhase(.finished)
       onProcessCompleted?(results)
     }
   }
@@ -96,7 +93,8 @@ final class BetaTestViewController: UIViewController {
     configureNavigationBarAppearance()
     setupViewHierarchy()
     setupConstraints()
-    setContinueButtonState(.start)
+    setupObservers()
+    setRunPhase(.idle)
   }
 
   override func viewWillAppear(_ animated: Bool) {
@@ -122,7 +120,59 @@ final class BetaTestViewController: UIViewController {
     collectionView.collectionViewLayout.invalidateLayout()
   }
 
+  #if DEBUG
+  func debug_runPhase() -> RunPhase { runPhase }
+  func debug_defaultFinalState(for index: Int) -> BetaTestCardState { defaultFinalState(for: index) }
+  func debug_itemState(at index: Int) -> BetaTestCardState? {
+    guard items.indices.contains(index) else { return nil }
+    return items[index].state
+  }
+
+  func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
+  #endif
+
   // MARK: Private
+
+  private struct RunCoordinator {
+
+    // MARK: Internal
+
+    mutating func beginProcessingRun() -> UUID {
+      activeProcessRunID = UUID()
+      activeRetryRunIDs.removeAll()
+      return activeProcessRunID
+    }
+
+    func isProcessingRunActive(_ id: UUID) -> Bool {
+      activeProcessRunID == id
+    }
+
+    func isRetryIdle(at index: Int) -> Bool {
+      activeRetryRunIDs[index] == nil
+    }
+
+    mutating func beginRetry(at index: Int) -> UUID? {
+      guard activeRetryRunIDs[index] == nil else { return nil }
+      let id = UUID()
+      activeRetryRunIDs[index] = id
+      return id
+    }
+
+    func isRetryActive(_ id: UUID, at index: Int) -> Bool {
+      activeRetryRunIDs[index] == id
+    }
+
+    mutating func endRetry(at index: Int, id: UUID) {
+      guard activeRetryRunIDs[index] == id else { return }
+      activeRetryRunIDs[index] = nil
+    }
+
+    // MARK: Private
+
+    private var activeProcessRunID = UUID()
+    private var activeRetryRunIDs = [Int: UUID]()
+
+  }
 
   private enum Layout {
     static let contentTopCornerRadius: CGFloat = 30
@@ -142,10 +192,8 @@ final class BetaTestViewController: UIViewController {
   }
 
   private var items = BetaTestViewController.defaultItems()
-  private var isProcessing = false
-  private var processRunID = UUID()
-  private var retryRunIDs = [Int: UUID]()
-  private var continueButtonState = ContinueButtonState.start
+  private var runPhase = RunPhase.idle
+  private var runCoordinator = RunCoordinator()
 
   private var lastCollectionWidth: CGFloat = 0
   private var lastContinueButtonShadowBounds = CGRect.zero
@@ -235,6 +283,10 @@ final class BetaTestViewController: UIViewController {
     return view
   }()
 
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
   private static func defaultItems() -> [BetaTestItem] {
     [
       BetaTestItem(title: "CPU", icon: .cpu, state: .initial),
@@ -250,6 +302,20 @@ final class BetaTestViewController: UIViewController {
       BetaTestItem(title: "Tes Layar Sentuh", icon: .touch, state: .initial),
       BetaTestItem(title: "Tes Kartu SIM", icon: .sim, state: .initial),
     ]
+  }
+
+  private func setupObservers() {
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleMemoryWarningNotification),
+      name: UIApplication.didReceiveMemoryWarningNotification,
+      object: nil,
+    )
+  }
+
+  @objc
+  private func handleMemoryWarningNotification() {
+    BetaTestCollectionViewCell.clearFallbackImageCache()
   }
 
   private func setupViewHierarchy() {
@@ -354,15 +420,15 @@ final class BetaTestViewController: UIViewController {
 
   @objc
   private func handleContinueTap() {
-    switch continueButtonState {
-    case .start:
+    switch runPhase {
+    case .idle:
       onContinueButtonTapped?()
       beginProcessing()
 
-    case .loading:
+    case .processing:
       return
 
-    case .finish:
+    case .finished:
       onContinueButtonTapped?()
     }
   }
@@ -389,23 +455,23 @@ final class BetaTestViewController: UIViewController {
     collectionView.reloadData()
   }
 
-  private func setContinueButtonState(_ state: ContinueButtonState) {
-    continueButtonState = state
+  private func setRunPhase(_ phase: RunPhase) {
+    runPhase = phase
 
-    switch state {
-    case .start:
+    switch phase {
+    case .idle:
       continueButton.setTitle("Mulai Tes", for: .normal)
       continueButton.setTitleColor(.white, for: .normal)
       continueButton.backgroundColor = .betaTestHeaderGreen
       continueButton.isEnabled = true
 
-    case .loading:
+    case .processing:
       continueButton.setTitle("Dalam Pengecekan", for: .normal)
       continueButton.setTitleColor(.betaTestLoadingText, for: .normal)
       continueButton.backgroundColor = .betaTestLoadingBackground
       continueButton.isEnabled = false
 
-    case .finish:
+    case .finished:
       continueButton.setTitle("Lanjut", for: .normal)
       continueButton.setTitleColor(.white, for: .normal)
       continueButton.backgroundColor = .betaTestHeaderGreen
@@ -416,23 +482,22 @@ final class BetaTestViewController: UIViewController {
   private func handleRetryTap(at index: Int) {
     guard items.indices.contains(index) else { return }
     guard items[index].state == .failed else { return }
-    guard retryRunIDs[index] == nil else { return }
+    guard runCoordinator.isRetryIdle(at: index) else { return }
 
     let title = items[index].title
     onRetryButtonTapped?(index, title)
 
-    let retryRunID = UUID()
-    retryRunIDs[index] = retryRunID
+    guard let retryRunID = runCoordinator.beginRetry(at: index) else { return }
     setItemState(.loading, at: index, reload: true)
 
     DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
       guard let self else { return }
-      guard retryRunIDs[index] == retryRunID else { return }
+      guard runCoordinator.isRetryActive(retryRunID, at: index) else { return }
       guard items.indices.contains(index) else { return }
 
       let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
       setItemState(resolvedState, at: index, reload: true)
-      retryRunIDs[index] = nil
+      runCoordinator.endRetry(at: index, id: retryRunID)
 
       onRetryCompleted?(ProcessResult(index: index, title: title, state: resolvedState))
     }
@@ -573,7 +638,7 @@ struct BetaTestItem {
 
 // MARK: - BetaTestCardState
 
-enum BetaTestCardState {
+enum BetaTestCardState: Equatable {
   case initial
   case loading
   case success
@@ -583,83 +648,3 @@ enum BetaTestCardState {
 // MARK: - BetaTestCollectionViewCell
 
 // Extracted to BetaTestCollectionViewCell.swift
-
-extension UIColor {
-
-  // MARK: Internal
-
-  static let betaTestPrimaryText = betaTestDynamic(light: .black, dark: .white)
-  static let betaTestSurface = betaTestDynamic(
-    light: .white,
-    dark: UIColor(red: 28.0 / 255.0, green: 28.0 / 255.0, blue: 30.0 / 255.0, alpha: 1),
-  )
-  static let betaTestBadgeBackground = betaTestDynamic(
-    light: UIColor(white: 1.0, alpha: 0.92),
-    dark: UIColor(white: 0.22, alpha: 0.92),
-  )
-
-  static let betaTestHeaderGreen = betaTestDynamic(
-    light: UIColor(red: 54.0 / 255.0, green: 132.0 / 255.0, blue: 3.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 32.0 / 255.0, green: 92.0 / 255.0, blue: 24.0 / 255.0, alpha: 1),
-  )
-  static let betaTestLoadingText = betaTestDynamic(
-    light: UIColor(red: 173.0 / 255.0, green: 177.0 / 255.0, blue: 178.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 178.0 / 255.0, green: 181.0 / 255.0, blue: 182.0 / 255.0, alpha: 1),
-  )
-  static let betaTestLoadingBackground = betaTestDynamic(
-    light: UIColor(red: 215.0 / 255.0, green: 220.0 / 255.0, blue: 222.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 70.0 / 255.0, green: 74.0 / 255.0, blue: 77.0 / 255.0, alpha: 1),
-  )
-  static let betaTestSapGreen = betaTestDynamic(
-    light: UIColor(red: 74.0 / 255.0, green: 144.0 / 255.0, blue: 28.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 122.0 / 255.0, green: 201.0 / 255.0, blue: 84.0 / 255.0, alpha: 1),
-  )
-  static let betaTestLabelGreen = betaTestHeaderGreen
-  static let betaTestStatusGreen = betaTestDynamic(
-    light: UIColor(red: 76.0 / 255.0, green: 153.0 / 255.0, blue: 31.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 132.0 / 255.0, green: 210.0 / 255.0, blue: 95.0 / 255.0, alpha: 1),
-  )
-  static let betaTestErrorRed = betaTestDynamic(
-    light: UIColor(red: 194.0 / 255.0, green: 50.0 / 255.0, blue: 0, alpha: 1),
-    dark: UIColor(red: 255.0 / 255.0, green: 105.0 / 255.0, blue: 97.0 / 255.0, alpha: 1),
-  )
-  static let betaTestDarkGray = betaTestDynamic(
-    light: UIColor(red: 53.0 / 255.0, green: 53.0 / 255.0, blue: 53.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 198.0 / 255.0, green: 198.0 / 255.0, blue: 198.0 / 255.0, alpha: 1),
-  )
-  static let betaTestLightGray = betaTestDynamic(
-    light: UIColor(red: 244.0 / 255.0, green: 244.0 / 255.0, blue: 244.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 44.0 / 255.0, green: 44.0 / 255.0, blue: 46.0 / 255.0, alpha: 1),
-  )
-  static let betaTestInitialCard = betaTestLightGray
-  static let betaTestDisabledCard = betaTestLightGray
-  static let betaTestDisabledCircle = betaTestDynamic(
-    light: UIColor(red: 214.0 / 255.0, green: 214.0 / 255.0, blue: 214.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 84.0 / 255.0, green: 84.0 / 255.0, blue: 88.0 / 255.0, alpha: 1),
-  )
-  static let betaTestDisabledIcon = betaTestDynamic(
-    light: UIColor(red: 80.0 / 255.0, green: 80.0 / 255.0, blue: 80.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 196.0 / 255.0, green: 196.0 / 255.0, blue: 196.0 / 255.0, alpha: 1),
-  )
-  static let betaTestSuccessCircle = betaTestDynamic(
-    light: UIColor(red: 218.0 / 255.0, green: 229.0 / 255.0, blue: 212.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 43.0 / 255.0, green: 74.0 / 255.0, blue: 47.0 / 255.0, alpha: 1),
-  )
-  static let betaTestErrorCircle = betaTestDynamic(
-    light: UIColor(red: 234.0 / 255.0, green: 213.0 / 255.0, blue: 213.0 / 255.0, alpha: 1),
-    dark: UIColor(red: 84.0 / 255.0, green: 44.0 / 255.0, blue: 44.0 / 255.0, alpha: 1),
-  )
-
-  // MARK: Private
-
-  private static func betaTestDynamic(light: UIColor, dark: UIColor) -> UIColor {
-    if #available(iOS 13.0, *) {
-      UIColor { traitCollection in
-        traitCollection.userInterfaceStyle == .dark ? dark : light
-      }
-    } else {
-      light
-    }
-  }
-
-}

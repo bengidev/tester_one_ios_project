@@ -25,6 +25,10 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     fatalError("init(coder:) has not been implemented")
   }
 
+  static func clearFallbackImageCache() {
+    fallbackImageCache.removeAll()
+  }
+
   static func preferredHeightsByRow(
     for itemWidth: CGFloat,
     titles: [String],
@@ -360,6 +364,8 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   }
 
   private func fallbackImage(for icon: BetaTestItem.IconType) -> UIImage? {
+    assert(Thread.isMainThread, "UI image lookups should happen on main thread.")
+
     if let cached = Self.fallbackImageCache[icon] {
       return cached
     }
