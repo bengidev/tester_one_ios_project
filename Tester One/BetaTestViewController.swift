@@ -378,6 +378,8 @@ final class BetaTestViewController: UIViewController {
 
   private func setItemState(_ state: BetaTestCardState, at index: Int, reload: Bool) {
     guard items.indices.contains(index) else { return }
+    guard items[index].state != state else { return }
+
     items[index].state = state
 
     guard reload else { return }
@@ -532,7 +534,7 @@ extension BetaTestViewController {
 // MARK: - BetaTestItem
 
 private struct BetaTestItem {
-  enum IconType {
+  enum IconType: CaseIterable {
     case cpu
     case hardDisk
     case battery
@@ -771,6 +773,8 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
     .sim: ["simImage", "networkImage", "cpuImage", "failedImage"],
   ]
 
+  private static var fallbackImageCache = [BetaTestItem.IconType: UIImage?]()
+
   private static func successStatusImage() -> UIImage? {
     if let image = UIImage(named: "successImage") {
       return image.withRenderingMode(.alwaysOriginal)
@@ -930,12 +934,13 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
   }
 
   private func fallbackImage(for icon: BetaTestItem.IconType) -> UIImage? {
-    for assetName in fallbackAssetNames(for: icon) {
-      if let image = UIImage(named: assetName) {
-        return image
-      }
+    if let cached = Self.fallbackImageCache[icon] {
+      return cached
     }
-    return nil
+
+    let resolvedImage = fallbackAssetNames(for: icon).lazy.compactMap { UIImage(named: $0) }.first
+    Self.fallbackImageCache[icon] = resolvedImage
+    return resolvedImage
   }
 
   private func fallbackAssetNames(for icon: BetaTestItem.IconType) -> [String] {
