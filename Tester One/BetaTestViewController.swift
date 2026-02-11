@@ -219,7 +219,6 @@ final class BetaTestViewController: UIViewController {
     button.backgroundColor = .betaTestHeaderGreen
     button.layer.cornerRadius = Layout.buttonCornerRadius
     button.clipsToBounds = true
-    button.layer.masksToBounds = true
     button.contentHorizontalAlignment = .center
     button.addTarget(self, action: #selector(handleContinueTap), for: .touchUpInside)
     button.accessibilityIdentifier = "BetaTestViewController.continueButton"
@@ -546,7 +545,23 @@ private struct BetaTestItem {
 
   let title: String
   let icon: IconType
+  let accessibilityToken: String
   var state: BetaTestCardState
+
+  init(title: String, icon: IconType, state: BetaTestCardState) {
+    self.title = title
+    self.icon = icon
+    self.state = state
+    accessibilityToken = Self.makeAccessibilityToken(from: title)
+  }
+
+  private static func makeAccessibilityToken(from title: String) -> String {
+    let normalized = String(title.lowercased().map { character in
+      character.isLetter || character.isNumber ? character : "_"
+    })
+    let collapsed = normalized.replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
+    return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+  }
 }
 
 // MARK: - BetaTestCardState
@@ -629,7 +644,7 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
   }
 
   func configure(with item: BetaTestItem) {
-    let token = Self.accessibilityToken(for: item.title)
+    let token = item.accessibilityToken
     accessibilityIdentifier = "BetaTestCell.\(token)"
     contentView.accessibilityIdentifier = "BetaTestCell.\(token).contentView"
     cardView.accessibilityIdentifier = "BetaTestCell.\(token).cardView"
@@ -750,14 +765,6 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
     }
 
     return nil
-  }
-
-  private static func accessibilityToken(for title: String) -> String {
-    let normalized = String(title.lowercased().map { character in
-      character.isLetter || character.isNumber ? character : "_"
-    })
-    let collapsed = normalized.replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
-    return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
   }
 
   private static func maxTitleHeight(for titles: [String], width: CGFloat, font: UIFont) -> CGFloat {
@@ -894,15 +901,50 @@ private final class BetaTestCollectionViewCell: UICollectionViewCell {
       return
     }
 
-    // iOS 12 fallback: reuse provided assets first before any custom drawing.
-    if let fallbackImage = UIImage(named: "cpuImage") {
-      iconImageView.tintColor = tintColor
-      iconImageView.image = fallbackImage.withRenderingMode(.alwaysTemplate)
-    } else if let fallbackImage = UIImage(named: "failedImage") {
+    // iOS 12 fallback: choose icon-specific assets when available, then fallback safely.
+    if let fallbackImage = fallbackImage(for: icon) {
       iconImageView.tintColor = tintColor
       iconImageView.image = fallbackImage.withRenderingMode(.alwaysTemplate)
     } else {
       iconImageView.image = nil
+    }
+  }
+
+  private func fallbackImage(for icon: BetaTestItem.IconType) -> UIImage? {
+    for assetName in fallbackAssetNames(for: icon) {
+      if let image = UIImage(named: assetName) {
+        return image
+      }
+    }
+    return nil
+  }
+
+  private func fallbackAssetNames(for icon: BetaTestItem.IconType) -> [String] {
+    switch icon {
+    case .cpu:
+      return ["cpuImage", "failedImage"]
+    case .hardDisk:
+      return ["hardDiskImage", "storageImage", "cpuImage", "failedImage"]
+    case .battery:
+      return ["batteryImage", "cpuImage", "failedImage"]
+    case .jailbreak:
+      return ["securityImage", "cpuImage", "failedImage"]
+    case .biometricOne:
+      return ["faceIDImage", "biometricImage", "cpuImage", "failedImage"]
+    case .biometricTwo:
+      return ["touchIDImage", "biometricImage", "cpuImage", "failedImage"]
+    case .silent:
+      return ["silentImage", "audioImage", "cpuImage", "failedImage"]
+    case .volume:
+      return ["volumeImage", "audioImage", "cpuImage", "failedImage"]
+    case .power:
+      return ["powerImage", "cpuImage", "failedImage"]
+    case .camera:
+      return ["cameraImage", "cpuImage", "failedImage"]
+    case .touch:
+      return ["touchImage", "screenImage", "cpuImage", "failedImage"]
+    case .sim:
+      return ["simImage", "networkImage", "cpuImage", "failedImage"]
     }
   }
 
