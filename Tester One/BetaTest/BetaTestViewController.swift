@@ -16,7 +16,6 @@ import UIKit
 /// let navigationController = UINavigationController(rootViewController: rootViewController)
 /// window?.rootViewController = navigationController
 final class BetaTestViewController: UIViewController {
-
   // MARK: Internal
 
   struct ProcessResult {
@@ -285,6 +284,7 @@ final class BetaTestViewController: UIViewController {
 
   private static func defaultItems() -> [BetaTestItem] {
     [
+      makeDefaultItem(title: "Tester", icon: .jailbreak, initialState: .success),
       makeDefaultItem(title: "CPU", icon: .cpu, initialState: .success),
       makeDefaultItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
       makeDefaultItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),

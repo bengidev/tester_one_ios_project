@@ -46,6 +46,7 @@ Replace batch/parallel result updates with chained sequential updates per card, 
 **Notes:**
 - Sequential chain behavior preserved.
 - Retry now shares exactly the same per-item execution pipeline as normal run.
+- Removed temporary debug/demo runtime behavior from `BetaTestViewController.defaultItems()` (no `static` counter, no print-driven conditional state).
 
 ---
 

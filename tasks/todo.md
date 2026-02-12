@@ -16,4 +16,5 @@
 - [x] Add per-cell execution function support through item initialization (`executionHandler`).
 - [ ] Beng manual UI validation on device/simulator.
 - [ ] Tune per-cell timings and visuals after manual feedback.
-- [x] Add explicit completion callback containing all final results (`onAllProcessesCompleted`).
+- [x] Keep a single lifecycle callback surface (`onProcessingEvent`) and avoid redundant completion hooks.
+- [x] Remove temporary debug/demo execution logic from `defaultItems()` (`static var` counters, print-based behavior).
