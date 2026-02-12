@@ -7,7 +7,8 @@ import Foundation
 
 struct BetaTestItem {
 
-  typealias ExecutionHandler = (_ phase: ExecutionPhase, _ completion: @escaping (BetaTestCardState) -> Void) -> Void
+  /// MUST call `continueExecutionWithState(...)` exactly once to continue the sequential chain.
+  typealias ExecutionHandler = (_ phase: ExecutionPhase, _ continueExecutionWithState: @escaping (BetaTestCardState) -> Void) -> Void
 
   // MARK: Internal
 

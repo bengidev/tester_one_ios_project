@@ -79,6 +79,8 @@ final class BetaTestViewController: UIViewController {
   }
 
   /// Customize one cell execution behavior without touching others.
+  /// The provided handler MUST call `continueExecutionWithState(...)` exactly once.
+  /// If not called, sequential processing will stall at that cell.
   func updateItemExecutionHandler(at index: Int, handler: @escaping BetaTestItem.ExecutionHandler) {
     guard items.indices.contains(index) else { return }
     items[index].executionHandler = handler
@@ -309,10 +311,10 @@ final class BetaTestViewController: UIViewController {
       title: title,
       icon: icon,
       state: .initial,
-      executionHandler: { phase, completion in
-        // let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
+      executionHandler: { phase, continueExecutionWithState in
+        let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
         DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
-          completion(.failed)
+          continueExecutionWithState(state)
         }
       },
     )
@@ -590,9 +592,9 @@ final class BetaTestViewController: UIViewController {
       done(.failed)
     }
 
-    handler(phase) { state in
+    handler(phase) { resultingState in
       DispatchQueue.main.async {
-        completion(state)
+        completion(resultingState)
       }
     }
   }
