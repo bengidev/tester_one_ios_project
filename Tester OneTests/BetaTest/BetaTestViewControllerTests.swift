@@ -30,7 +30,7 @@ final class Tester_OneTests: XCTestCase {
     sut.processDuration = 0.01
 
     let exp = expectation(description: "processing completed")
-    var capturedResults: [BetaTestViewController.ProcessResult] = []
+    var capturedResults = [BetaTestViewController.ProcessResult]()
 
     sut.onProcessCompleted = { results in
       capturedResults = results
