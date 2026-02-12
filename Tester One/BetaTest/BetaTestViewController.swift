@@ -31,15 +31,6 @@ final class BetaTestViewController: UIViewController {
     case finished
   }
 
-  typealias StateResolver = (_ index: Int, _ title: String) -> BetaTestCardState
-
-  /// Default duration for simulated process transition from loading -> final state.
-  /// Per-item override lives in `BetaTestItem.RunPlan.loadingDuration`.
-  var processDuration: TimeInterval = 1.2
-
-  /// Custom resolver for final item state after loading. Defaults to internal resolver when nil.
-  var stateResolver: StateResolver?
-
   enum ProcessingEvent {
     case stepCompleted(ProcessResult)
     case runCompleted([ProcessResult])
@@ -87,10 +78,10 @@ final class BetaTestViewController: UIViewController {
     reloadItem(at: index)
   }
 
-  /// Customize one cell run behavior without touching others.
-  func updateItemRunPlan(at index: Int, mutate: (inout BetaTestItem.RunPlan) -> Void) {
+  /// Customize one cell execution behavior without touching others.
+  func updateItemExecutionHandler(at index: Int, handler: @escaping BetaTestItem.ExecutionHandler) {
     guard items.indices.contains(index) else { return }
-    mutate(&items[index].runPlan)
+    items[index].executionHandler = handler
   }
 
   override func viewDidLoad() {
@@ -118,7 +109,7 @@ final class BetaTestViewController: UIViewController {
 
     guard
       previousTraitCollection?.preferredContentSizeCategory
-      != traitCollection.preferredContentSizeCategory
+        != traitCollection.preferredContentSizeCategory
     else { return }
 
     cachedRowMeasurements = nil
@@ -126,14 +117,13 @@ final class BetaTestViewController: UIViewController {
   }
 
   #if DEBUG
-  func debug_runPhase() -> RunPhase { runPhase }
-  func debug_defaultFinalState(for index: Int) -> BetaTestCardState { defaultFinalState(for: index) }
-  func debug_itemState(at index: Int) -> BetaTestCardState? {
-    guard items.indices.contains(index) else { return nil }
-    return items[index].state
-  }
+    func debug_runPhase() -> RunPhase { runPhase }
+    func debug_itemState(at index: Int) -> BetaTestCardState? {
+      guard items.indices.contains(index) else { return nil }
+      return items[index].state
+    }
 
-  func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
+    func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
   #endif
 
   // MARK: Private
@@ -202,11 +192,12 @@ final class BetaTestViewController: UIViewController {
 
   private var lastCollectionWidth: CGFloat = 0
   private var lastContinueButtonShadowBounds = CGRect.zero
-  private var cachedRowMeasurements: (
-    width: CGFloat,
-    contentSizeCategory: UIContentSizeCategory,
-    heightsByRow: [CGFloat],
-  )?
+  private var cachedRowMeasurements:
+    (
+      width: CGFloat,
+      contentSizeCategory: UIContentSizeCategory,
+      heightsByRow: [CGFloat],
+    )?
 
   private lazy var collectionLayout: UICollectionViewFlowLayout = {
     let layout = UICollectionViewFlowLayout()
@@ -244,7 +235,9 @@ final class BetaTestViewController: UIViewController {
     view.dataSource = self
     view.delegate = self
     view.accessibilityIdentifier = "BetaTestViewController.collectionView"
-    view.register(BetaTestCollectionViewCell.self, forCellWithReuseIdentifier: BetaTestCollectionViewCell.reuseIdentifier)
+    view.register(
+      BetaTestCollectionViewCell.self,
+      forCellWithReuseIdentifier: BetaTestCollectionViewCell.reuseIdentifier)
     return view
   }()
 
@@ -290,19 +283,39 @@ final class BetaTestViewController: UIViewController {
 
   private static func defaultItems() -> [BetaTestItem] {
     [
-      BetaTestItem(title: "CPU", icon: .cpu, state: .initial),
-      BetaTestItem(title: "Hard Disk", icon: .hardDisk, state: .initial),
-      BetaTestItem(title: "Kondisi Baterai", icon: .battery, state: .initial),
-      BetaTestItem(title: "Tes Jailbreak", icon: .jailbreak, state: .initial),
-      BetaTestItem(title: "Tes Biometric 1", icon: .biometricOne, state: .initial),
-      BetaTestItem(title: "Tes Biometric 2", icon: .biometricTwo, state: .initial),
-      BetaTestItem(title: "Tombol Silent", icon: .silent, state: .initial),
-      BetaTestItem(title: "Tombol Volume", icon: .volume, state: .initial),
-      BetaTestItem(title: "Tombol On/Off", icon: .power, state: .initial),
-      BetaTestItem(title: "Tes Kamera", icon: .camera, state: .initial),
-      BetaTestItem(title: "Tes Layar Sentuh", icon: .touch, state: .initial),
-      BetaTestItem(title: "Tes Kartu SIM", icon: .sim, state: .initial),
+      makeDefaultItem(title: "CPU", icon: .cpu, initialState: .success),
+      makeDefaultItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
+      makeDefaultItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
+      makeDefaultItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
+      makeDefaultItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
+      makeDefaultItem(title: "Tes Biometric 2", icon: .biometricTwo, initialState: .success),
+      makeDefaultItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
+      makeDefaultItem(title: "Tombol Volume", icon: .volume, initialState: .success),
+      makeDefaultItem(title: "Tombol On/Off", icon: .power, initialState: .success),
+      makeDefaultItem(title: "Tes Kamera", icon: .camera, initialState: .success),
+      makeDefaultItem(title: "Tes Layar Sentuh", icon: .touch, initialState: .success),
+      makeDefaultItem(title: "Tes Kartu SIM", icon: .sim, initialState: .success),
     ]
+  }
+
+  private static func makeDefaultItem(
+    title: String,
+    icon: BetaTestItem.IconType,
+    initialState: BetaTestCardState,
+    retryState: BetaTestCardState = .success,
+    simulatedDuration: TimeInterval = 0.25,
+  ) -> BetaTestItem {
+    BetaTestItem(
+      title: title,
+      icon: icon,
+      state: .initial,
+      executionHandler: { phase, completion in
+        // let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
+        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
+          completion(.failed)
+        }
+      },
+    )
   }
 
   private func setupObservers() {
@@ -383,8 +396,10 @@ final class BetaTestViewController: UIViewController {
         equalTo: bottomOverlayView.trailingAnchor,
         constant: -Layout.buttonHorizontalInset,
       ),
-      continueButtonShadowView.topAnchor.constraint(equalTo: bottomOverlayView.topAnchor, constant: Layout.bottomSectionTopInset),
-      continueButtonShadowView.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.buttonHeight),
+      continueButtonShadowView.topAnchor.constraint(
+        equalTo: bottomOverlayView.topAnchor, constant: Layout.bottomSectionTopInset),
+      continueButtonShadowView.heightAnchor.constraint(
+        greaterThanOrEqualToConstant: Layout.buttonHeight),
       continueButtonShadowView.bottomAnchor.constraint(
         equalTo: bottomOverlayView.safeAreaLayoutGuide.bottomAnchor,
         constant: -Layout.bottomSectionBottomInset,
@@ -413,10 +428,11 @@ final class BetaTestViewController: UIViewController {
     guard bounds != lastContinueButtonShadowBounds else { return }
 
     lastContinueButtonShadowBounds = bounds
-    continueButtonShadowView.layer.shadowPath = UIBezierPath(
-      roundedRect: bounds,
-      cornerRadius: Layout.buttonCornerRadius,
-    ).cgPath
+    continueButtonShadowView.layer.shadowPath =
+      UIBezierPath(
+        roundedRect: bounds,
+        cornerRadius: Layout.buttonCornerRadius,
+      ).cgPath
   }
 
   @objc
@@ -487,32 +503,12 @@ final class BetaTestViewController: UIViewController {
       return
     }
 
-    updateItemState(.loading, at: index, animated: true) { [weak self] in
+    executeItem(at: index, phase: .initial) { [weak self] result in
       guard let self else { return }
       guard runCoordinator.isProcessingRunActive(runID) else { return }
 
-      let item = items[index]
-      let loadingDuration = item.runPlan.loadingDuration > 0 ? item.runPlan.loadingDuration : processDuration
-
-      DispatchQueue.main.asyncAfter(deadline: .now() + loadingDuration) { [weak self] in
-        guard let self else { return }
-        guard runCoordinator.isProcessingRunActive(runID) else { return }
-
-        let title = items[index].title
-        let resolvedState =
-          items[index].runPlan.initialFinalState
-            ?? stateResolver?(index, title)
-            ?? defaultFinalState(for: index)
-
-        updateItemState(resolvedState, at: index, animated: true) { [weak self] in
-          guard let self else { return }
-          guard runCoordinator.isProcessingRunActive(runID) else { return }
-
-          let result = ProcessResult(index: index, title: title, state: resolvedState)
-          onProcessingEvent?(.stepCompleted(result))
-          processNextItem(at: index + 1, runID: runID, results: results + [result])
-        }
-      }
+      onProcessingEvent?(.stepCompleted(result))
+      processNextItem(at: index + 1, runID: runID, results: results + [result])
     }
   }
 
@@ -549,35 +545,57 @@ final class BetaTestViewController: UIViewController {
     onRetryButtonTapped?(index, title)
 
     guard let retryRunID = runCoordinator.beginRetry(at: index) else { return }
-    updateItemState(.loading, at: index, animated: true)
-
-    let loadingDuration = items[index].runPlan.loadingDuration > 0 ? items[index].runPlan.loadingDuration : processDuration
-    DispatchQueue.main.asyncAfter(deadline: .now() + loadingDuration) { [weak self] in
+    executeItem(at: index, phase: .retry) { [weak self] result in
       guard let self else { return }
       guard runCoordinator.isRetryActive(retryRunID, at: index) else { return }
+
+      runCoordinator.endRetry(at: index, id: retryRunID)
+      onProcessingEvent?(.stepCompleted(result))
+      onRetryCompleted?(result)
+    }
+  }
+
+  private func executeItem(
+    at index: Int,
+    phase: BetaTestItem.ExecutionPhase,
+    completion: @escaping (ProcessResult) -> Void,
+  ) {
+    guard items.indices.contains(index) else { return }
+
+    updateItemState(.loading, at: index, animated: true) { [weak self] in
+      guard let self else { return }
       guard items.indices.contains(index) else { return }
 
-      let resolvedState =
-        items[index].runPlan.retryFinalState
-          ?? stateResolver?(index, title)
-          ?? defaultFinalState(for: index)
-
-      updateItemState(resolvedState, at: index, animated: true) { [weak self] in
+      performItemExecution(at: index, phase: phase) { [weak self] finalState in
         guard let self else { return }
-        runCoordinator.endRetry(at: index, id: retryRunID)
+        guard items.indices.contains(index) else { return }
 
-        let result = ProcessResult(index: index, title: title, state: resolvedState)
-        onProcessingEvent?(.stepCompleted(result))
-        onRetryCompleted?(result)
+        let title = items[index].title
+        updateItemState(finalState, at: index, animated: true) {
+          completion(ProcessResult(index: index, title: title, state: finalState))
+        }
       }
     }
   }
 
-  private func defaultFinalState(for index: Int) -> BetaTestCardState {
-    // Keep current behavior: only "Tombol Silent" card (index 6 in default dataset) fails by default.
-    index == 6 ? .failed : .success
-  }
+  private func performItemExecution(
+    at index: Int,
+    phase: BetaTestItem.ExecutionPhase,
+    completion: @escaping (BetaTestCardState) -> Void,
+  ) {
+    guard items.indices.contains(index) else { return }
 
+    let handler = items[index].executionHandler ?? { _, done in
+      assertionFailure("Missing executionHandler for item at index \(index)")
+      done(.failed)
+    }
+
+    handler(phase) { state in
+      DispatchQueue.main.async {
+        completion(state)
+      }
+    }
+  }
 }
 
 // MARK: UICollectionViewDataSource
@@ -587,7 +605,9 @@ extension BetaTestViewController: UICollectionViewDataSource {
     items.count
   }
 
-  func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+  func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath)
+    -> UICollectionViewCell
+  {
     let cell = collectionView.dequeueReusableCell(
       withReuseIdentifier: BetaTestCollectionViewCell.reuseIdentifier,
       for: indexPath,
@@ -633,8 +653,7 @@ extension BetaTestViewController {
   private func adaptiveCardHeight(for itemWidth: CGFloat, at itemIndex: Int) -> CGFloat {
     let contentSizeCategory = traitCollection.preferredContentSizeCategory
     let rowIndex = max(0, itemIndex / Layout.cardsPerRow)
-    if
-      let cachedRowMeasurements,
+    if let cachedRowMeasurements,
       abs(cachedRowMeasurements.width - itemWidth) < 0.5,
       cachedRowMeasurements.contentSizeCategory == contentSizeCategory,
       rowIndex < cachedRowMeasurements.heightsByRow.count

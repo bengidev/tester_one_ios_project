@@ -15,26 +15,18 @@ final class Tester_OneTests: XCTestCase {
   }
 
   @MainActor
-  func testDefaultFinalStateMapping() {
-    let sut = BetaTestViewController()
-    _ = sut.view
-
-    XCTAssertEqual(sut.debug_defaultFinalState(for: 6), .failed)
-    XCTAssertEqual(sut.debug_defaultFinalState(for: 0), .success)
-  }
-
-  @MainActor
   func testBeginProcessingTransitionsToFinishedAndReturnsResults() {
     let sut = BetaTestViewController()
     _ = sut.view
-    sut.processDuration = 0.01
 
     let exp = expectation(description: "processing completed")
     var capturedResults = [BetaTestViewController.ProcessResult]()
 
-    sut.onProcessCompleted = { results in
-      capturedResults = results
-      exp.fulfill()
+    sut.onProcessingEvent = { event in
+      if case let .runCompleted(results) = event {
+        capturedResults = results
+        exp.fulfill()
+      }
     }
 
     sut.beginProcessing()
@@ -50,7 +42,6 @@ final class Tester_OneTests: XCTestCase {
   func testRetryFlowIgnoresStaleCompletionWhenNewRunStarts() {
     let sut = BetaTestViewController()
     _ = sut.view
-    sut.processDuration = 0.05
 
     // Make index 0 retryable.
     sut.setState(.failed, at: 0)
@@ -60,10 +51,14 @@ final class Tester_OneTests: XCTestCase {
     sut.beginProcessing()
 
     let exp = expectation(description: "new run completed")
-    sut.onProcessCompleted = { _ in exp.fulfill() }
+    sut.onProcessingEvent = { event in
+      if case .runCompleted = event {
+        exp.fulfill()
+      }
+    }
     wait(for: [exp], timeout: 1.0)
 
-    // New run should complete to deterministic default mapping (index 0 success).
+    // New run should complete using each item's configured execution handler (index 0 success).
     XCTAssertEqual(sut.debug_itemState(at: 0), .success)
     XCTAssertEqual(sut.debug_runPhase(), .finished)
   }

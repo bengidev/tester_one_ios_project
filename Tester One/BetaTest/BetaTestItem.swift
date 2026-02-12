@@ -7,6 +7,8 @@ import Foundation
 
 struct BetaTestItem {
 
+  typealias ExecutionHandler = (_ phase: ExecutionPhase, _ completion: @escaping (BetaTestCardState) -> Void) -> Void
+
   // MARK: Internal
 
   struct Content {
@@ -25,20 +27,9 @@ struct BetaTestItem {
     }
   }
 
-  struct RunPlan {
-    var loadingDuration: TimeInterval
-    var initialFinalState: BetaTestCardState?
-    var retryFinalState: BetaTestCardState?
-
-    init(
-      loadingDuration: TimeInterval = 0,
-      initialFinalState: BetaTestCardState? = nil,
-      retryFinalState: BetaTestCardState? = nil,
-    ) {
-      self.loadingDuration = loadingDuration
-      self.initialFinalState = initialFinalState
-      self.retryFinalState = retryFinalState
-    }
+  enum ExecutionPhase {
+    case initial
+    case retry
   }
 
   enum IconType: CaseIterable {
@@ -57,8 +48,8 @@ struct BetaTestItem {
   }
 
   var content: Content
-  var runPlan: RunPlan
   var state: BetaTestCardState
+  var executionHandler: ExecutionHandler?
 
   var title: String { content.title }
   var icon: IconType { content.icon }
@@ -69,11 +60,11 @@ struct BetaTestItem {
     icon: IconType,
     state: BetaTestCardState,
     retryButtonTitle: String = "Ulangi",
-    runPlan: RunPlan = RunPlan(),
+    executionHandler: ExecutionHandler? = nil,
   ) {
     content = Content(title: title, icon: icon, retryButtonTitle: retryButtonTitle)
-    self.runPlan = runPlan
     self.state = state
+    self.executionHandler = executionHandler
   }
 
   // MARK: Private

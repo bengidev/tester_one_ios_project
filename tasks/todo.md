@@ -12,5 +12,7 @@
 - [x] Add per-item update APIs in `BetaTestViewController`.
 - [x] Simplify lifecycle callbacks into one event callback (`onProcessingEvent`) for chain actions.
 - [x] Improve state transitions to feel smooth on visible cells (non-snappy).
+- [x] Refactor execution engine into singular path (`executeItem`) used by both sequential run and retry.
+- [x] Add per-cell execution function support through item initialization (`executionHandler`).
 - [ ] Beng manual UI validation on device/simulator.
 - [ ] Tune per-cell timings and visuals after manual feedback.

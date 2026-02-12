@@ -29,6 +29,24 @@ Replace batch/parallel result updates with chained sequential updates per card, 
 - Uses `UIView.transition(... .transitionCrossDissolve ...)` for visible-cell state change.
 - Keeps `processDuration` as fallback, with per-item `RunPlan.loadingDuration` override.
 
+### Attempt 2: Singular Executor + Item-Owned Handlers
+
+**Approach:**
+- Consolidate duplicated execution flows (`processNextItem`, `handleRetryTap`) into one executor path.
+- Add per-item function hooks directly in `defaultItems` setup so each card has explicit behavior.
+
+**Steps:**
+1. Added `BetaTestItem.ExecutionPhase` and `executionHandler`.
+2. Refactored controller to use `executeItem(...)` for both initial and retry cycles.
+3. Added `performItemExecution(...)` and `resolveStateForItem(...)` to separate item-specific behavior from orchestration.
+4. Updated `defaultItems` to initialize each item with its own execution handler.
+
+**Result:** ⬜ In Progress (awaiting Beng manual UI validation)
+
+**Notes:**
+- Sequential chain behavior preserved.
+- Retry now shares exactly the same per-item execution pipeline as normal run.
+
 ---
 
 > Track tasks with multiple attempts, success/failure states, and fallback strategies.
