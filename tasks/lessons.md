@@ -10,3 +10,4 @@
 - If initial run and retry share lifecycle logic, route both through one executor function (`executeItem`) to keep behavior consistent and easier to reason about.
 - Put per-cell behavior as item-level execution handlers during `defaultItems` setup so each card owns its specific execution path.
 - Once all cards own execution handlers, remove global default-state fallback logic (it becomes dead/ambiguous behavior).
+- Even with event enums, a dedicated aggregate callback can reduce integration friction for consumers that only care about final results.

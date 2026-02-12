@@ -40,6 +40,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow(frame: UIScreen.main.bounds)
     // Set BetaTestViewController as root for design comparison
     let rootViewController = BetaTestViewController()
+    rootViewController.onProcessingEvent = { event in
+        if case let .runCompleted(results) = event {
+            print("runCompleted results: \(results)")
+            print("runCompleted last results: \(results.last, default: "")")
+        }
+    }
+
     let navigationController = UINavigationController(rootViewController: rootViewController)
     window?.rootViewController = navigationController
     window?.makeKeyAndVisible()
