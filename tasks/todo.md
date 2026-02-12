@@ -10,7 +10,7 @@
 - [x] Replace batch processing with chain/sequential processing per cell.
 - [x] Add per-item customization model (`BetaTestItem.Content` + `BetaTestItem.RunPlan`).
 - [x] Add per-item update APIs in `BetaTestViewController`.
-- [x] Add per-step main-thread callback (`onProcessStepCompleted`) for chain actions.
+- [x] Simplify lifecycle callbacks into one event callback (`onProcessingEvent`) for chain actions.
 - [x] Improve state transitions to feel smooth on visible cells (non-snappy).
 - [ ] Beng manual UI validation on device/simulator.
 - [ ] Tune per-cell timings and visuals after manual feedback.

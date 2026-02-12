@@ -6,3 +6,4 @@
 - Keep per-cell behavior in the item model (`Content` + `RunPlan`) so one card can change without side effects to others.
 - For transition quality, animate state changes inside the visible cell (`transitionCrossDissolve`) and avoid full-grid reloads during processing.
 - Keep a controller-level fallback duration (`processDuration`) while allowing per-item overrides for real-world tuning.
+- If two callbacks represent the same lifecycle, merge into one event callback with enum payload (`onProcessingEvent`) to reduce confusion.

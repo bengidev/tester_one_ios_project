@@ -40,11 +40,13 @@ final class BetaTestViewController: UIViewController {
   /// Custom resolver for final item state after loading. Defaults to internal resolver when nil.
   var stateResolver: StateResolver?
 
-  /// Callback invoked after each card finishes one processing step (main thread).
-  var onProcessStepCompleted: ((ProcessResult) -> Void)?
+  enum ProcessingEvent {
+    case stepCompleted(ProcessResult)
+    case runCompleted([ProcessResult])
+  }
 
-  /// Callback invoked after all items finish processing.
-  var onProcessCompleted: (([ProcessResult]) -> Void)?
+  /// Single callback surface for processing lifecycle to avoid duplicated hooks.
+  var onProcessingEvent: ((ProcessingEvent) -> Void)?
 
   /// Optional callback invoked when continue button is tapped.
   var onContinueButtonTapped: (() -> Void)?
@@ -481,7 +483,7 @@ final class BetaTestViewController: UIViewController {
 
     guard items.indices.contains(index) else {
       setRunPhase(.finished)
-      onProcessCompleted?(results)
+      onProcessingEvent?(.runCompleted(results))
       return
     }
 
@@ -507,7 +509,7 @@ final class BetaTestViewController: UIViewController {
           guard runCoordinator.isProcessingRunActive(runID) else { return }
 
           let result = ProcessResult(index: index, title: title, state: resolvedState)
-          onProcessStepCompleted?(result)
+          onProcessingEvent?(.stepCompleted(result))
           processNextItem(at: index + 1, runID: runID, results: results + [result])
         }
       }
@@ -565,7 +567,7 @@ final class BetaTestViewController: UIViewController {
         runCoordinator.endRetry(at: index, id: retryRunID)
 
         let result = ProcessResult(index: index, title: title, state: resolvedState)
-        onProcessStepCompleted?(result)
+        onProcessingEvent?(.stepCompleted(result))
         onRetryCompleted?(result)
       }
     }
