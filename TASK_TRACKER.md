@@ -1,5 +1,36 @@
 # Task Tracker Template
 
+## Task: BetaTest Sequential Chain Processing + Per-Cell Customization
+
+**Created:** 2026-02-12  
+**Priority:** 1
+
+### Objective
+Replace batch/parallel result updates with chained sequential updates per card, enable per-cell customization parameters, and expose main-thread callback hooks after each step.
+
+### Success Criteria
+- [x] Processing runs sequentially cell-by-cell (loading -> result -> next).
+- [x] Per-cell config can be updated without touching all cells.
+- [x] A callback fires after each cell process completes (main thread).
+- [x] Transition feels smooth (no hard snap for visible cells).
+- [x] Build/test-compile validates via CLI without manual simulator run.
+
+### Attempt 1: Sequential Controller + Cell Transition API
+
+**Approach:**
+- Refactor `BetaTestViewController.beginProcessing()` into recursive/chain execution.
+- Expand `BetaTestItem` with `Content` + `RunPlan` for per-cell params.
+- Add `onProcessStepCompleted` callback and per-item update APIs.
+- Add animated state transition method in `BetaTestCollectionViewCell`.
+
+**Result:** ⬜ In Progress (awaiting Beng manual UI validation)
+
+**Notes:**
+- Uses `UIView.transition(... .transitionCrossDissolve ...)` for visible-cell state change.
+- Keeps `processDuration` as fallback, with per-item `RunPlan.loadingDuration` override.
+
+---
+
 > Track tasks with multiple attempts, success/failure states, and fallback strategies.
 
 ---

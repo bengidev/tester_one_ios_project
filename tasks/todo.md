@@ -1,7 +1,16 @@
-# Tester One Refactor Plan (Phase 1)
+# Tester One Refactor Plan
 
+## Phase 1 — Scope Focus (completed)
 - [x] Confirm active app entry flow (`BetaTestViewController`) and baseline build health.
 - [x] Quarantine legacy DeviceTest path from app target without deleting source files.
 - [x] Validate CLI build succeeds (no simulator app launch).
-- [x] Validate test target build/tests from CLI.
-- [ ] Manual UI verification by Beng.
+- [x] Validate test target compile path succeeds.
+
+## Phase 2 — Sequential Chain Execution + Cell Customization
+- [x] Replace batch processing with chain/sequential processing per cell.
+- [x] Add per-item customization model (`BetaTestItem.Content` + `BetaTestItem.RunPlan`).
+- [x] Add per-item update APIs in `BetaTestViewController`.
+- [x] Add per-step main-thread callback (`onProcessStepCompleted`) for chain actions.
+- [x] Improve state transitions to feel smooth on visible cells (non-snappy).
+- [ ] Beng manual UI validation on device/simulator.
+- [ ] Tune per-cell timings and visuals after manual feedback.

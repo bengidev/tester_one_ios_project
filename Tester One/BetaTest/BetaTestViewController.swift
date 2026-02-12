@@ -33,11 +33,15 @@ final class BetaTestViewController: UIViewController {
 
   typealias StateResolver = (_ index: Int, _ title: String) -> BetaTestCardState
 
-  /// Duration for simulated process transition from loading -> final state.
+  /// Default duration for simulated process transition from loading -> final state.
+  /// Per-item override lives in `BetaTestItem.RunPlan.loadingDuration`.
   var processDuration: TimeInterval = 1.2
 
   /// Custom resolver for final item state after loading. Defaults to internal resolver when nil.
   var stateResolver: StateResolver?
+
+  /// Callback invoked after each card finishes one processing step (main thread).
+  var onProcessStepCompleted: ((ProcessResult) -> Void)?
 
   /// Callback invoked after all items finish processing.
   var onProcessCompleted: (([ProcessResult]) -> Void)?
@@ -55,41 +59,36 @@ final class BetaTestViewController: UIViewController {
     NotificationCenter.default.removeObserver(self)
   }
 
-  /// Starts loading -> result transition for all cards.
+  /// Starts loading -> result transition for all cards in chained sequential order.
   func beginProcessing() {
     guard runPhase != .processing else { return }
 
     let runID = runCoordinator.beginProcessingRun()
     setRunPhase(.processing)
-    updateAllItemStates(.loading)
-
-    DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
-      guard let self else { return }
-      guard runCoordinator.isProcessingRunActive(runID) else { return }
-
-      var results = [ProcessResult]()
-
-      for index in items.indices {
-        let title = items[index].title
-        let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
-        setItemState(resolvedState, at: index, reload: false)
-        results.append(ProcessResult(index: index, title: title, state: resolvedState))
-      }
-
-      reloadAllItems()
-      setRunPhase(.finished)
-      onProcessCompleted?(results)
-    }
+    processNextItem(at: 0, runID: runID, results: [])
   }
 
   /// Manually set a single card state (useful for external action chains).
   func setState(_ state: BetaTestCardState, at index: Int) {
-    setItemState(state, at: index, reload: true)
+    updateItemState(state, at: index, animated: false)
   }
 
   /// Manually set all card states.
   func setAllStates(_ state: BetaTestCardState) {
     updateAllItemStates(state)
+  }
+
+  /// Customize one cell content without touching others.
+  func updateItemContent(at index: Int, mutate: (inout BetaTestItem.Content) -> Void) {
+    guard items.indices.contains(index) else { return }
+    mutate(&items[index].content)
+    reloadItem(at: index)
+  }
+
+  /// Customize one cell run behavior without touching others.
+  func updateItemRunPlan(at index: Int, mutate: (inout BetaTestItem.RunPlan) -> Void) {
+    guard items.indices.contains(index) else { return }
+    mutate(&items[index].runPlan)
   }
 
   override func viewDidLoad() {
@@ -435,24 +434,84 @@ final class BetaTestViewController: UIViewController {
 
   private func updateAllItemStates(_ state: BetaTestCardState) {
     for index in items.indices {
-      setItemState(state, at: index, reload: false)
+      items[index].state = state
+      updateItemState(
+        state,
+        at: index,
+        animated: false,
+        completion: nil,
+      )
     }
-    reloadAllItems()
   }
 
-  private func setItemState(_ state: BetaTestCardState, at index: Int, reload: Bool) {
+  private func reloadItem(at index: Int) {
     guard items.indices.contains(index) else { return }
-    guard items[index].state != state else { return }
-
-    items[index].state = state
-
-    guard reload else { return }
     collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
   }
 
-  private func reloadAllItems() {
-    guard !items.isEmpty else { return }
-    collectionView.reloadData()
+  private func updateItemState(
+    _ state: BetaTestCardState,
+    at index: Int,
+    animated: Bool,
+    completion: (() -> Void)? = nil,
+  ) {
+    guard items.indices.contains(index) else {
+      completion?()
+      return
+    }
+
+    items[index].state = state
+    let indexPath = IndexPath(item: index, section: 0)
+
+    if let cell = collectionView.cellForItem(at: indexPath) as? BetaTestCollectionViewCell {
+      cell.transition(to: state, item: items[index], animated: animated, completion: completion)
+      return
+    }
+
+    collectionView.reloadItems(at: [indexPath])
+    completion?()
+  }
+
+  private func processNextItem(
+    at index: Int,
+    runID: UUID,
+    results: [ProcessResult],
+  ) {
+    guard runCoordinator.isProcessingRunActive(runID) else { return }
+
+    guard items.indices.contains(index) else {
+      setRunPhase(.finished)
+      onProcessCompleted?(results)
+      return
+    }
+
+    updateItemState(.loading, at: index, animated: true) { [weak self] in
+      guard let self else { return }
+      guard runCoordinator.isProcessingRunActive(runID) else { return }
+
+      let item = items[index]
+      let loadingDuration = item.runPlan.loadingDuration > 0 ? item.runPlan.loadingDuration : processDuration
+
+      DispatchQueue.main.asyncAfter(deadline: .now() + loadingDuration) { [weak self] in
+        guard let self else { return }
+        guard runCoordinator.isProcessingRunActive(runID) else { return }
+
+        let title = items[index].title
+        let resolvedState =
+          items[index].runPlan.initialFinalState
+            ?? stateResolver?(index, title)
+            ?? defaultFinalState(for: index)
+
+        updateItemState(resolvedState, at: index, animated: true) { [weak self] in
+          guard let self else { return }
+          guard runCoordinator.isProcessingRunActive(runID) else { return }
+
+          let result = ProcessResult(index: index, title: title, state: resolvedState)
+          onProcessStepCompleted?(result)
+          processNextItem(at: index + 1, runID: runID, results: results + [result])
+        }
+      }
+    }
   }
 
   private func setRunPhase(_ phase: RunPhase) {
@@ -488,18 +547,27 @@ final class BetaTestViewController: UIViewController {
     onRetryButtonTapped?(index, title)
 
     guard let retryRunID = runCoordinator.beginRetry(at: index) else { return }
-    setItemState(.loading, at: index, reload: true)
+    updateItemState(.loading, at: index, animated: true)
 
-    DispatchQueue.main.asyncAfter(deadline: .now() + processDuration) { [weak self] in
+    let loadingDuration = items[index].runPlan.loadingDuration > 0 ? items[index].runPlan.loadingDuration : processDuration
+    DispatchQueue.main.asyncAfter(deadline: .now() + loadingDuration) { [weak self] in
       guard let self else { return }
       guard runCoordinator.isRetryActive(retryRunID, at: index) else { return }
       guard items.indices.contains(index) else { return }
 
-      let resolvedState = stateResolver?(index, title) ?? defaultFinalState(for: index)
-      setItemState(resolvedState, at: index, reload: true)
-      runCoordinator.endRetry(at: index, id: retryRunID)
+      let resolvedState =
+        items[index].runPlan.retryFinalState
+          ?? stateResolver?(index, title)
+          ?? defaultFinalState(for: index)
 
-      onRetryCompleted?(ProcessResult(index: index, title: title, state: resolvedState))
+      updateItemState(resolvedState, at: index, animated: true) { [weak self] in
+        guard let self else { return }
+        runCoordinator.endRetry(at: index, id: retryRunID)
+
+        let result = ProcessResult(index: index, title: title, state: resolvedState)
+        onProcessStepCompleted?(result)
+        onRetryCompleted?(result)
+      }
     }
   }
 

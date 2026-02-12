@@ -92,9 +92,39 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     titleLabel.accessibilityIdentifier = "BetaTestCell.\(token).titleLabel"
 
     titleLabel.text = item.title
+    retryBadgeButton.setTitle(item.content.retryButtonTitle, for: .normal)
 
     applyState(item.state)
     applyIcon(for: item.icon, state: item.state)
+  }
+
+  func transition(
+    to state: BetaTestCardState,
+    item: BetaTestItem,
+    animated: Bool,
+    completion: (() -> Void)? = nil,
+  ) {
+    let applyChanges = { [self] in
+      titleLabel.text = item.title
+      retryBadgeButton.setTitle(item.content.retryButtonTitle, for: .normal)
+      applyState(state)
+      applyIcon(for: item.icon, state: state)
+      layoutIfNeeded()
+    }
+
+    guard animated else {
+      applyChanges()
+      completion?()
+      return
+    }
+
+    UIView.transition(
+      with: cardView,
+      duration: 0.24,
+      options: [.transitionCrossDissolve, .allowAnimatedContent, .curveEaseInOut],
+      animations: applyChanges,
+      completion: { _ in completion?() },
+    )
   }
 
   // MARK: Private
