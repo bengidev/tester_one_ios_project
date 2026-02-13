@@ -19,16 +19,6 @@ final class BetaTestViewController: UIViewController {
 
   // MARK: Internal
 
-  init(items: [BetaTestItem]) {
-    self.items = items
-    super.init(nibName: nil, bundle: nil)
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
   struct ProcessResult {
     let index: Int
     let title: String
@@ -57,6 +47,20 @@ final class BetaTestViewController: UIViewController {
 
   /// Optional callback invoked when a single retry completes.
   var onRetryCompleted: ((ProcessResult) -> Void)?
+
+  init(
+    items: [BetaTestItem],
+    layoutStrategy: BetaTestLayoutStrategy = .uniformGrid,
+  ) {
+    self.items = items
+    self.layoutStrategy = layoutStrategy
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
 
   deinit {
     NotificationCenter.default.removeObserver(self)
@@ -190,6 +194,7 @@ final class BetaTestViewController: UIViewController {
     static let gridInterItemSpacing: CGFloat = 12
     static let gridLineSpacing: CGFloat = 12
     static let cardsPerRow = 2
+    static let mosaicBigItemCharacterThreshold = 34
 
     static let bottomSectionTopInset: CGFloat = 16
     static let bottomSectionBottomInset: CGFloat = 16
@@ -199,6 +204,7 @@ final class BetaTestViewController: UIViewController {
   }
 
   private var items: [BetaTestItem]
+  private let layoutStrategy: BetaTestLayoutStrategy
   private var runPhase = RunPhase.idle
   private var runCoordinator = RunCoordinator()
 
@@ -211,7 +217,7 @@ final class BetaTestViewController: UIViewController {
       heightsByRow: [CGFloat],
     )?
 
-  private lazy var collectionLayout: UICollectionViewFlowLayout = {
+  private lazy var uniformGridLayout: UICollectionViewFlowLayout = {
     let layout = UICollectionViewFlowLayout()
     layout.scrollDirection = .vertical
     layout.estimatedItemSize = .zero
@@ -223,6 +229,23 @@ final class BetaTestViewController: UIViewController {
     )
     layout.minimumInteritemSpacing = Layout.gridInterItemSpacing
     layout.minimumLineSpacing = Layout.gridLineSpacing
+    return layout
+  }()
+
+  private lazy var adaptiveMosaicLayout: BetaTestAdaptiveMosaicLayout = {
+    let layout = BetaTestAdaptiveMosaicLayout()
+    layout.delegate = self
+    layout.sectionInsets = UIEdgeInsets(
+      top: Layout.gridTopInset,
+      left: Layout.gridHorizontalInset,
+      bottom: Layout.gridBottomInset,
+      right: Layout.gridHorizontalInset,
+    )
+    layout.interItemSpacing = Layout.gridInterItemSpacing
+    layout.lineSpacing = Layout.gridLineSpacing
+    layout.rowUnit = 10
+    layout.minimumItemHeight = 110
+    layout.singleColumnBreakpoint = 340
     return layout
   }()
 
@@ -238,7 +261,7 @@ final class BetaTestViewController: UIViewController {
   }()
 
   private lazy var collectionView: UICollectionView = {
-    let view = UICollectionView(frame: .zero, collectionViewLayout: collectionLayout)
+    let view = UICollectionView(frame: .zero, collectionViewLayout: activeCollectionLayout)
     view.translatesAutoresizingMaskIntoConstraints = false
     view.backgroundColor = .betaTestSurface
     view.alwaysBounceVertical = true
@@ -293,6 +316,15 @@ final class BetaTestViewController: UIViewController {
     view.accessibilityIdentifier = "BetaTestViewController.continueButtonShadowView"
     return view
   }()
+
+  private var activeCollectionLayout: UICollectionViewLayout {
+    switch layoutStrategy {
+    case .uniformGrid:
+      uniformGridLayout
+    case .adaptiveMosaic:
+      adaptiveMosaicLayout
+    }
+  }
 
   private func setupObservers() {
     NotificationCenter.default.addObserver(
@@ -403,13 +435,19 @@ final class BetaTestViewController: UIViewController {
   private func updateContinueButtonShadowPathIfNeeded() {
     let bounds = continueButtonShadowView.bounds
     guard bounds.width > 0, bounds.height > 0 else { return }
+
+    let dynamicCornerRadius = bounds.height / 2
+    if abs(continueButton.layer.cornerRadius - dynamicCornerRadius) > 0.5 {
+      continueButton.layer.cornerRadius = dynamicCornerRadius
+    }
+
     guard bounds != lastContinueButtonShadowBounds else { return }
 
     lastContinueButtonShadowBounds = bounds
     continueButtonShadowView.layer.shadowPath =
       UIBezierPath(
         roundedRect: bounds,
-        cornerRadius: Layout.buttonCornerRadius,
+        cornerRadius: dynamicCornerRadius,
       ).cgPath
   }
 
@@ -613,7 +651,10 @@ extension BetaTestViewController: UICollectionViewDelegateFlowLayout {
     layout _: UICollectionViewLayout,
     sizeForItemAt indexPath: IndexPath,
   ) -> CGSize {
-    let sectionInsets = collectionLayout.sectionInset
+    guard layoutStrategy == .uniformGrid else {
+      return .zero
+    }
+    let sectionInsets = uniformGridLayout.sectionInset
     let horizontalInsets = sectionInsets.left + sectionInsets.right
     let contentWidth = collectionView.bounds.width - horizontalInsets
     guard contentWidth > 0 else { return .zero }
@@ -657,6 +698,32 @@ extension BetaTestViewController {
     }
 
     return measuredHeights.last ?? 0
+  }
+}
+
+// MARK: BetaTestAdaptiveMosaicLayout.Delegate
+
+extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
+  func adaptiveMosaicLayout(
+    _: BetaTestAdaptiveMosaicLayout,
+    preferredHeightForItemAt indexPath: IndexPath,
+    fitting width: CGFloat,
+  ) -> CGFloat {
+    guard items.indices.contains(indexPath.item) else { return 110 }
+    return BetaTestCollectionViewCell.preferredHeight(
+      for: width,
+      title: items[indexPath.item].title,
+      traitCollection: traitCollection,
+    )
+  }
+
+  func adaptiveMosaicLayout(
+    _: BetaTestAdaptiveMosaicLayout,
+    prefersExpandedItemAt indexPath: IndexPath,
+  ) -> Bool {
+    guard items.indices.contains(indexPath.item) else { return false }
+    let title = items[indexPath.item].title
+    return title.count >= Layout.mosaicBigItemCharacterThreshold
   }
 }
 

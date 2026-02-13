@@ -11,6 +11,8 @@ import UIKit
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
 
+  // MARK: Internal
+
   var window: UIWindow?
 
   lazy var persistentContainer: NSPersistentContainer = {
@@ -39,7 +41,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
     window = UIWindow(frame: UIScreen.main.bounds)
     // Set BetaTestViewController as root for design comparison
-    let rootViewController = BetaTestViewController(items: makeBetaTestItemsForHost())
+    let rootViewController = BetaTestViewController(
+      items: makeBetaTestItemsForHost(),
+      layoutStrategy: .adaptiveMosaic,
+    )
     rootViewController.onProcessingEvent = { event in
       if case .runCompleted(let results) = event {
         print("runCompleted results: \(results)")
@@ -52,6 +57,26 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     window?.makeKeyAndVisible()
     return true
   }
+
+  func applicationDidEnterBackground(_: UIApplication) {
+    saveContext()
+  }
+
+  func saveContext() {
+    let context = persistentContainer.viewContext
+    if context.hasChanges {
+      do {
+        try context.save()
+      } catch {
+        // Replace this implementation with code to handle the error appropriately.
+        // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
+        let nserror = error as NSError
+        fatalError("Unresolved error \(nserror), \(nserror.userInfo)")
+      }
+    }
+  }
+
+  // MARK: Private
 
   private func makeBetaTestItemsForHost() -> [BetaTestItem] {
     [
@@ -87,25 +112,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
           continueExecutionWithState(state)
         }
-      }
+      },
     )
   }
 
-  func applicationDidEnterBackground(_: UIApplication) {
-    saveContext()
-  }
-
-  func saveContext() {
-    let context = persistentContainer.viewContext
-    if context.hasChanges {
-      do {
-        try context.save()
-      } catch {
-        // Replace this implementation with code to handle the error appropriately.
-        // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-        let nserror = error as NSError
-        fatalError("Unresolved error \(nserror), \(nserror.userInfo)")
-      }
-    }
-  }
 }

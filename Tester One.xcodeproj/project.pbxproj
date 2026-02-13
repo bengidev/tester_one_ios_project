@@ -33,10 +33,10 @@
 		ECF1AA352F2C470F00E551E5 /* Exceptions for "Tester One" folder in "Tester One" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"AlphaTestTableViewCell.swift",
-				"CharlieTestTableViewCell.swift",
-				"DeviceTestTableViewCell.swift",
-				"DeviceTestViewController.swift",
+				AlphaTestTableViewCell.swift,
+				CharlieTestTableViewCell.swift,
+				DeviceTestTableViewCell.swift,
+				DeviceTestViewController.swift,
 				Info.plist,
 			);
 			target = ECF1AA092F2C470C00E551E5 /* Tester One */;

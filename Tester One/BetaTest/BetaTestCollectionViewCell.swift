@@ -29,6 +29,35 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     fallbackImageCache.removeAll()
   }
 
+  static func preferredHeight(
+    for itemWidth: CGFloat,
+    title: String,
+    traitCollection: UITraitCollection,
+  ) -> CGFloat {
+    guard itemWidth > 0 else { return 0 }
+
+    let titleWidth = max(itemWidth - (Layout.contentInset * 2), 1)
+    let baseFont = UIFont.systemFont(ofSize: 16, weight: .medium)
+    let titleFont: UIFont =
+      if #available(iOS 11.0, *) {
+        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont, compatibleWith: traitCollection)
+      } else {
+        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
+      }
+
+    let measuredTitleHeight = maxTitleHeight(for: [title], width: titleWidth, font: titleFont)
+    let semanticBottomSpacing = semanticCardBottomSpacing(for: titleFont)
+    let cardHeight =
+      Layout.contentInset
+        + Layout.iconCircleSize
+        + Layout.topRowSpacing
+        + measuredTitleHeight
+        + Layout.titleBottomInset
+        + semanticBottomSpacing
+
+    return ceil(cardHeight)
+  }
+
   static func preferredHeightsByRow(
     for itemWidth: CGFloat,
     titles: [String],

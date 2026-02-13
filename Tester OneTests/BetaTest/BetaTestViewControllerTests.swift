@@ -8,6 +8,8 @@ import XCTest
 
 final class Tester_OneTests: XCTestCase {
 
+  // MARK: Internal
+
   @MainActor
   func testBetaTestItemAccessibilityTokenNormalization() {
     let item = BetaTestItem(title: "Tes Kartu SIM #1", icon: .sim, state: .initial)
@@ -78,6 +80,8 @@ final class Tester_OneTests: XCTestCase {
     XCTAssertEqual(second, .initial)
   }
 
+  // MARK: Private
+
   private func makeFixtureItems() -> [BetaTestItem] {
     [
       makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .success),
@@ -111,7 +115,7 @@ final class Tester_OneTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
           continueExecutionWithState(state)
         }
-      }
+      },
     )
   }
 }
