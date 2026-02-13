@@ -36,26 +36,22 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   ) -> CGFloat {
     guard itemWidth > 0 else { return 0 }
 
-    let titleWidth = max(itemWidth - (Layout.contentInset * 2), 1)
-    let baseFont = UIFont.systemFont(ofSize: 16, weight: .medium)
-    let titleFont: UIFont =
-      if #available(iOS 11.0, *) {
-        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont, compatibleWith: traitCollection)
-      } else {
-        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
-      }
+    // Use an offscreen sizing cell so measured height exactly matches runtime Auto Layout.
+    let cell = sizingCell
+    cell.bounds = CGRect(x: 0, y: 0, width: itemWidth, height: 2000)
+    cell.contentView.bounds = cell.bounds
+    cell.applySizingTitle(title, traitCollection: traitCollection)
+    cell.setNeedsLayout()
+    cell.layoutIfNeeded()
 
-    let measuredTitleHeight = maxTitleHeight(for: [title], width: titleWidth, font: titleFont)
-    let semanticBottomSpacing = semanticCardBottomSpacing(for: titleFont)
-    let cardHeight =
-      Layout.contentInset
-        + Layout.iconCircleSize
-        + Layout.topRowSpacing
-        + measuredTitleHeight
-        + Layout.titleBottomInset
-        + semanticBottomSpacing
+    let target = CGSize(width: itemWidth, height: UIView.layoutFittingCompressedSize.height)
+    let measured = cell.contentView.systemLayoutSizeFitting(
+      target,
+      withHorizontalFittingPriority: .required,
+      verticalFittingPriority: .fittingSizeLevel,
+    )
 
-    return ceil(cardHeight)
+    return ceil(max(measured.height, Layout.minimumMeasuredCardHeight))
   }
 
   static func preferredHeightsByRow(
@@ -67,36 +63,41 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     guard itemWidth > 0 else { return [] }
     guard itemsPerRow > 0 else { return [] }
 
-    let titleWidth = max(itemWidth - (Layout.contentInset * 2), 1)
-    let baseFont = UIFont.systemFont(ofSize: 16, weight: .medium)
-    let titleFont: UIFont =
-      if #available(iOS 11.0, *) {
-        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont, compatibleWith: traitCollection)
-      } else {
-        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
-      }
-
-    let bottomInset = Layout.titleBottomInset
-    let semanticBottomSpacing = semanticCardBottomSpacing(for: titleFont)
     var rowHeights = [CGFloat]()
     var startIndex = 0
 
     while startIndex < titles.count {
       let endIndex = min(startIndex + itemsPerRow, titles.count)
-      let rowTitles = Array(titles[startIndex ..< endIndex])
-      let maximumTitleHeight = maxTitleHeight(for: rowTitles, width: titleWidth, font: titleFont)
-      let cardHeight =
-        Layout.contentInset
-          + Layout.iconCircleSize
-          + Layout.topRowSpacing
-          + maximumTitleHeight
-          + bottomInset
-          + semanticBottomSpacing
-      rowHeights.append(ceil(cardHeight))
+      let rowTitles = Array(titles[startIndex..<endIndex])
+      let rowMax = rowTitles.reduce(CGFloat(0)) { current, title in
+        max(
+          current,
+          preferredHeight(for: itemWidth, title: title, traitCollection: traitCollection),
+        )
+      }
+      rowHeights.append(ceil(max(rowMax, Layout.minimumMeasuredCardHeight)))
       startIndex = endIndex
     }
 
     return rowHeights
+  }
+
+  override func preferredLayoutAttributesFitting(
+    _ layoutAttributes: UICollectionViewLayoutAttributes
+  ) -> UICollectionViewLayoutAttributes {
+    let attributes = super.preferredLayoutAttributesFitting(layoutAttributes)
+    // Let Auto Layout determine the exact height needed for the content
+    let targetSize = CGSize(
+      width: layoutAttributes.size.width,
+      height: UIView.layoutFittingCompressedSize.height,
+    )
+    let autoLayoutSize = contentView.systemLayoutSizeFitting(
+      targetSize,
+      withHorizontalFittingPriority: .required,
+      verticalFittingPriority: .fittingSizeLevel,
+    )
+    attributes.size.height = autoLayoutSize.height
+    return attributes
   }
 
   override func prepareForReuse() {
@@ -125,6 +126,13 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
     applyState(item.state)
     applyIcon(for: item.icon, state: item.state)
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    // Update preferredMaxLayoutWidth for proper multiline text sizing
+    let availableWidth = cardView.bounds.width - (Layout.contentInset * 2)
+    titleLabel.preferredMaxLayoutWidth = max(0, availableWidth)
   }
 
   func transition(
@@ -168,6 +176,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     static let statusSize: CGFloat = 30
     static let topRowSpacing: CGFloat = 20
     static let retryHeight: CGFloat = 30
+    static let minimumMeasuredCardHeight: CGFloat = 120
   }
 
   private static let fallbackAssetNamesByIcon: [BetaTestItem.IconType: [String]] = [
@@ -186,6 +195,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   ]
 
   private static var fallbackImageCache = [BetaTestItem.IconType: UIImage?]()
+  private static let sizingCell = BetaTestCollectionViewCell(frame: .zero)
 
   private lazy var cardView: UIView = {
     let view = UIView()
@@ -261,6 +271,8 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     label.numberOfLines = 0
     label.setContentCompressionResistancePriority(.required, for: .vertical)
     label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    // Critical for multiline labels in self-sizing cells
+    label.preferredMaxLayoutWidth = 0
     return label
   }()
 
@@ -282,24 +294,46 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   private static func maxTitleHeight(for titles: [String], width: CGFloat, font: UIFont) -> CGFloat {
     guard width > 0 else { return ceil(font.lineHeight) }
 
-    let attributes: [NSAttributedString.Key: Any] = [.font: font]
-    let options: NSStringDrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
-    let constraint = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+    // Use actual UILabel for accurate measurement
+    let label = UILabel()
+    label.font = font
+    label.numberOfLines = 0
+    label.preferredMaxLayoutWidth = width
 
     return titles.reduce(ceil(font.lineHeight)) { currentMax, title in
-      let measured = (title as NSString).boundingRect(
-        with: constraint,
-        options: options,
-        attributes: attributes,
-        context: nil,
-      )
-      return max(currentMax, ceil(measured.height))
+      label.text = title
+      let size = label.sizeThatFits(CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
+      return max(currentMax, ceil(size.height))
     }
   }
 
   private static func semanticCardBottomSpacing(for titleFont: UIFont) -> CGFloat {
     let proportionalSpacing = ceil(titleFont.lineHeight * 0.20)
     return min(max(proportionalSpacing, 2), 10)
+  }
+
+  private func applySizingTitle(_ title: String, traitCollection: UITraitCollection) {
+    let baseFont = UIFont.systemFont(ofSize: 16, weight: .medium)
+    let scaledFont: UIFont =
+      if #available(iOS 11.0, *) {
+        UIFontMetrics(forTextStyle: .body).scaledFont(
+          for: baseFont,
+          compatibleWith: traitCollection,
+        )
+      } else {
+        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
+      }
+
+    titleLabel.font = scaledFont
+    titleLabel.text = title
+    titleLabel.numberOfLines = 0
+    let availableWidth = max(bounds.width - (Layout.contentInset * 2), 1)
+    titleLabel.preferredMaxLayoutWidth = availableWidth
+
+    // Keep sizing deterministic.
+    retryBadgeButton.isHidden = true
+    statusImageView.isHidden = true
+    loadingIndicator.stopAnimating()
   }
 
   private func setupCell() {
@@ -315,13 +349,28 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     cardView.addSubview(titleLabel)
 
     NSLayoutConstraint.activate([
-      cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Layout.cardInset),
-      cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Layout.cardInset),
+      cardView.leadingAnchor.constraint(
+        equalTo: contentView.leadingAnchor,
+        constant: Layout.cardInset,
+      ),
+      cardView.trailingAnchor.constraint(
+        equalTo: contentView.trailingAnchor,
+        constant: -Layout.cardInset,
+      ),
       cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.cardInset),
-      cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Layout.cardInset),
+      cardView.bottomAnchor.constraint(
+        equalTo: contentView.bottomAnchor,
+        constant: -Layout.cardInset,
+      ),
 
-      iconCircleView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: Layout.contentInset),
-      iconCircleView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: Layout.contentInset),
+      iconCircleView.leadingAnchor.constraint(
+        equalTo: cardView.leadingAnchor,
+        constant: Layout.contentInset,
+      ),
+      iconCircleView.topAnchor.constraint(
+        equalTo: cardView.topAnchor,
+        constant: Layout.contentInset,
+      ),
       iconCircleView.widthAnchor.constraint(equalToConstant: Layout.iconCircleSize),
       iconCircleView.heightAnchor.constraint(equalToConstant: Layout.iconCircleSize),
 
@@ -330,24 +379,45 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       iconImageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
       iconImageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
 
-      statusImageView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -Layout.contentInset),
+      statusImageView.trailingAnchor.constraint(
+        equalTo: cardView.trailingAnchor,
+        constant: -Layout.contentInset,
+      ),
       statusImageView.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
       statusImageView.widthAnchor.constraint(equalToConstant: Layout.statusSize),
       statusImageView.heightAnchor.constraint(equalToConstant: Layout.statusSize),
 
-      loadingIndicator.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -Layout.contentInset),
+      loadingIndicator.trailingAnchor.constraint(
+        equalTo: cardView.trailingAnchor,
+        constant: -Layout.contentInset,
+      ),
       loadingIndicator.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
       loadingIndicator.widthAnchor.constraint(equalToConstant: Layout.statusSize),
       loadingIndicator.heightAnchor.constraint(equalToConstant: Layout.statusSize),
 
-      retryBadgeButton.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -Layout.contentInset),
+      retryBadgeButton.trailingAnchor.constraint(
+        equalTo: cardView.trailingAnchor,
+        constant: -Layout.contentInset,
+      ),
       retryBadgeButton.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
       retryBadgeButton.heightAnchor.constraint(equalToConstant: Layout.retryHeight),
 
-      titleLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: Layout.contentInset),
-      titleLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -Layout.contentInset),
-      titleLabel.topAnchor.constraint(equalTo: iconCircleView.bottomAnchor, constant: Layout.topRowSpacing),
-      titleLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -Layout.titleBottomInset),
+      titleLabel.leadingAnchor.constraint(
+        equalTo: cardView.leadingAnchor,
+        constant: Layout.contentInset,
+      ),
+      titleLabel.trailingAnchor.constraint(
+        equalTo: cardView.trailingAnchor,
+        constant: -Layout.contentInset,
+      ),
+      titleLabel.topAnchor.constraint(
+        equalTo: iconCircleView.bottomAnchor,
+        constant: Layout.topRowSpacing,
+      ),
+      titleLabel.bottomAnchor.constraint(
+        equalTo: cardView.bottomAnchor,
+        constant: -Layout.titleBottomInset,
+      ),
     ])
   }
 

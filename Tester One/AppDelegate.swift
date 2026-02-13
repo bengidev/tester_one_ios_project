@@ -40,17 +40,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
   func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
     window = UIWindow(frame: UIScreen.main.bounds)
-    // Set BetaTestViewController as root for design comparison
-    let rootViewController = BetaTestViewController(
-      items: makeBetaTestItemsForHost(),
-      layoutStrategy: .adaptiveMosaic,
+    let rootViewController = BetaTestModule.makeViewController(
+      configuration: .init(
+        items: makeBetaTestItemsForHost(),
+        layoutStrategy: .adaptiveMosaic,
+        screen: .init(),
+      )
     )
-    rootViewController.onProcessingEvent = { event in
-      if case .runCompleted(let results) = event {
-        print("runCompleted results: \(results)")
-        print("runCompleted last results: \(results.last, default: "")")
-      }
-    }
 
     let navigationController = UINavigationController(rootViewController: rootViewController)
     window?.rootViewController = navigationController
@@ -78,11 +74,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
   // MARK: Private
 
-  private func makeBetaTestItemsForHost() -> [BetaTestItem] {
+  private func makeBetaTestItemsForHost() -> [BetaTestModuleConfiguration.Item] {
     [
-      makeHostItem(title: "Tester", icon: .jailbreak, initialState: .success),
-      makeHostItem(title: "CPU", icon: .cpu, initialState: .success),
-      makeHostItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
+      makeHostItem(
+        title: "Neque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velitNeque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velitNeque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit",
+        icon: .cpu,
+        initialState: .failed,
+      ),
+      makeHostItem(title: "Hard Disk", icon: .hardDisk, initialState: .failed),
       makeHostItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
       makeHostItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
       makeHostItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
@@ -102,17 +101,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     initialState: BetaTestCardState,
     retryState: BetaTestCardState = .success,
     simulatedDuration: TimeInterval = 0.25,
-  ) -> BetaTestItem {
-    BetaTestItem(
+  ) -> BetaTestModuleConfiguration.Item {
+    BetaTestModuleConfiguration.Item(
       title: title,
       icon: icon,
-      state: .initial,
-      executionHandler: { phase, continueExecutionWithState in
-        let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
-        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
-          continueExecutionWithState(state)
-        }
-      },
+      initialState: initialState,
+      retryState: retryState,
+      simulatedDuration: simulatedDuration,
     )
   }
 

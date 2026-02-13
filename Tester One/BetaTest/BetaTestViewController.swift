@@ -51,9 +51,11 @@ final class BetaTestViewController: UIViewController {
   init(
     items: [BetaTestItem],
     layoutStrategy: BetaTestLayoutStrategy = .uniformGrid,
+    screen: BetaTestModuleConfiguration.Screen = .init(),
   ) {
     self.items = items
     self.layoutStrategy = layoutStrategy
+    self.screen = screen
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -116,6 +118,7 @@ final class BetaTestViewController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    applyMosaicTuningProfileIfNeeded()
     updateCollectionLayoutIfNeeded()
     updateContinueButtonShadowPathIfNeeded()
   }
@@ -129,6 +132,7 @@ final class BetaTestViewController: UIViewController {
     else { return }
 
     cachedRowMeasurements = nil
+    applyMosaicTuningProfileIfNeeded(force: true)
     collectionView.collectionViewLayout.invalidateLayout()
   }
 
@@ -185,6 +189,16 @@ final class BetaTestViewController: UIViewController {
 
   }
 
+  private struct MosaicTuningProfile: Equatable {
+    let rowUnit: CGFloat
+    let minimumItemHeight: CGFloat
+    let singleColumnBreakpoint: CGFloat
+    let overlapTolerance: CGFloat
+    let bigItemMinimumSpan: Int
+    let bigItemMaximumSpan: Int
+    let bigItemMinimumHeight: CGFloat
+  }
+
   private enum Layout {
     static let contentTopCornerRadius: CGFloat = 30
 
@@ -194,7 +208,6 @@ final class BetaTestViewController: UIViewController {
     static let gridInterItemSpacing: CGFloat = 12
     static let gridLineSpacing: CGFloat = 12
     static let cardsPerRow = 2
-    static let mosaicBigItemMinimumHeight: CGFloat = 220
 
     static let bottomSectionTopInset: CGFloat = 16
     static let bottomSectionBottomInset: CGFloat = 16
@@ -205,6 +218,9 @@ final class BetaTestViewController: UIViewController {
 
   private var items: [BetaTestItem]
   private let layoutStrategy: BetaTestLayoutStrategy
+  private let screen: BetaTestModuleConfiguration.Screen
+  private var mosaicBigItemMinimumHeight: CGFloat = 220
+  private var lastAppliedMosaicProfile: MosaicTuningProfile?
   private var runPhase = RunPhase.idle
   private var runCoordinator = RunCoordinator()
 
@@ -356,7 +372,7 @@ final class BetaTestViewController: UIViewController {
   }
 
   private func configureNavigationBarAppearance() {
-    title = "Cek Fungsi"
+    title = screen.title
     navigationItem.largeTitleDisplayMode = .never
 
     guard let navigationBar = navigationController?.navigationBar else { return }
@@ -423,6 +439,100 @@ final class BetaTestViewController: UIViewController {
       continueButton.topAnchor.constraint(equalTo: continueButtonShadowView.topAnchor),
       continueButton.bottomAnchor.constraint(equalTo: continueButtonShadowView.bottomAnchor),
     ])
+  }
+
+  private func applyMosaicTuningProfileIfNeeded(force: Bool = false) {
+    guard layoutStrategy == .adaptiveMosaic else { return }
+
+    let width = collectionView.bounds.width
+    guard width > 0 else { return }
+
+    let profile = mosaicProfile(for: width, contentSizeCategory: traitCollection.preferredContentSizeCategory)
+    guard force || profile != lastAppliedMosaicProfile else { return }
+
+    adaptiveMosaicLayout.rowUnit = profile.rowUnit
+    adaptiveMosaicLayout.minimumItemHeight = profile.minimumItemHeight
+    adaptiveMosaicLayout.singleColumnBreakpoint = profile.singleColumnBreakpoint
+    adaptiveMosaicLayout.overlapTolerance = profile.overlapTolerance
+    adaptiveMosaicLayout.bigItemMinimumSpan = profile.bigItemMinimumSpan
+    adaptiveMosaicLayout.bigItemMaximumSpan = profile.bigItemMaximumSpan
+    mosaicBigItemMinimumHeight = profile.bigItemMinimumHeight
+
+    // Adjust insets for narrow screens to fit 2-column
+    if width <= 360 {
+      adaptiveMosaicLayout.sectionInsets = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+      adaptiveMosaicLayout.interItemSpacing = 6
+      adaptiveMosaicLayout.lineSpacing = 6
+    } else if width <= 400 {
+      adaptiveMosaicLayout.sectionInsets = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+      adaptiveMosaicLayout.interItemSpacing = 10
+      adaptiveMosaicLayout.lineSpacing = 10
+    } else {
+      adaptiveMosaicLayout.sectionInsets = UIEdgeInsets(
+        top: Layout.gridTopInset,
+        left: Layout.gridHorizontalInset,
+        bottom: Layout.gridBottomInset,
+        right: Layout.gridHorizontalInset,
+      )
+      adaptiveMosaicLayout.interItemSpacing = Layout.gridInterItemSpacing
+      adaptiveMosaicLayout.lineSpacing = Layout.gridLineSpacing
+    }
+
+    lastAppliedMosaicProfile = profile
+  }
+
+  private func mosaicProfile(
+    for width: CGFloat,
+    contentSizeCategory: UIContentSizeCategory,
+  ) -> MosaicTuningProfile {
+    if contentSizeCategory.isAccessibilityCategory {
+      // AX sizes: 2-column concept with adjusted sizing for larger text
+      return MosaicTuningProfile(
+        rowUnit: 10,
+        minimumItemHeight: 160,
+        singleColumnBreakpoint: 0, // NEVER use 1-column
+        overlapTolerance: 1.0,
+        bigItemMinimumSpan: 20,
+        bigItemMaximumSpan: 44,
+        bigItemMinimumHeight: 260,
+      )
+    }
+
+    if width <= 360 {
+      // Narrow devices: 2-column with minimal spacing
+      return MosaicTuningProfile(
+        rowUnit: 6, // Smaller grid unit
+        minimumItemHeight: 90, // Smaller cards for narrow screens
+        singleColumnBreakpoint: 0, // Force 2-column
+        overlapTolerance: 0.5,
+        bigItemMinimumSpan: 14, // Smaller big cards (140pt min)
+        bigItemMaximumSpan: 28, // Cap expansion
+        bigItemMinimumHeight: 160, // Lower threshold
+      )
+    }
+
+    if width <= 400 {
+      return MosaicTuningProfile(
+        rowUnit: 8,
+        minimumItemHeight: 120,
+        singleColumnBreakpoint: 0, // NEVER use 1-column
+        overlapTolerance: 0.5,
+        bigItemMinimumSpan: 20,
+        bigItemMaximumSpan: 42,
+        bigItemMinimumHeight: 220,
+      )
+    }
+
+    // MARK: Large devices → Structured mosaic with expansion
+    return MosaicTuningProfile(
+      rowUnit: 10,
+      minimumItemHeight: 120,
+      singleColumnBreakpoint: 0, // NEVER use 1-column
+      overlapTolerance: 1.0,
+      bigItemMinimumSpan: 20,
+      bigItemMaximumSpan: 50,
+      bigItemMinimumHeight: 240,
+    )
   }
 
   private func updateCollectionLayoutIfNeeded() {
@@ -536,19 +646,19 @@ final class BetaTestViewController: UIViewController {
 
     switch phase {
     case .idle:
-      continueButton.setTitle("Mulai Tes", for: .normal)
+      continueButton.setTitle(screen.continueButtonTitleIdle, for: .normal)
       continueButton.setTitleColor(.white, for: .normal)
       continueButton.backgroundColor = .betaTestHeaderGreen
       continueButton.isEnabled = true
 
     case .processing:
-      continueButton.setTitle("Dalam Pengecekan", for: .normal)
+      continueButton.setTitle(screen.continueButtonTitleLoading, for: .normal)
       continueButton.setTitleColor(.betaTestLoadingText, for: .normal)
       continueButton.backgroundColor = .betaTestLoadingBackground
       continueButton.isEnabled = false
 
     case .finished:
-      continueButton.setTitle("Lanjut", for: .normal)
+      continueButton.setTitle(screen.continueButtonTitleFinished, for: .normal)
       continueButton.setTitleColor(.white, for: .normal)
       continueButton.backgroundColor = .betaTestHeaderGreen
       continueButton.isEnabled = true
@@ -729,7 +839,8 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     let availableWidth = max(
       0,
       collectionView.bounds.width - layout.sectionInsets.left - layout.sectionInsets.right
-        - layout.interItemSpacing)
+        - layout.interItemSpacing,
+    )
     let itemWidth = max(0, availableWidth / 2)
     guard itemWidth > 0 else { return false }
 
@@ -738,7 +849,7 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
       title: items[indexPath.item].title,
       traitCollection: traitCollection,
     )
-    return preferredHeight >= Layout.mosaicBigItemMinimumHeight
+    return preferredHeight >= mosaicBigItemMinimumHeight
   }
 }
 
