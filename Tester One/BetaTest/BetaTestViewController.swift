@@ -16,7 +16,18 @@ import UIKit
 /// let navigationController = UINavigationController(rootViewController: rootViewController)
 /// window?.rootViewController = navigationController
 final class BetaTestViewController: UIViewController {
+
   // MARK: Internal
+
+  init(items: [BetaTestItem]) {
+    self.items = items
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
 
   struct ProcessResult {
     let index: Int
@@ -110,7 +121,7 @@ final class BetaTestViewController: UIViewController {
 
     guard
       previousTraitCollection?.preferredContentSizeCategory
-        != traitCollection.preferredContentSizeCategory
+      != traitCollection.preferredContentSizeCategory
     else { return }
 
     cachedRowMeasurements = nil
@@ -118,13 +129,13 @@ final class BetaTestViewController: UIViewController {
   }
 
   #if DEBUG
-    func debug_runPhase() -> RunPhase { runPhase }
-    func debug_itemState(at index: Int) -> BetaTestCardState? {
-      guard items.indices.contains(index) else { return nil }
-      return items[index].state
-    }
+  func debug_runPhase() -> RunPhase { runPhase }
+  func debug_itemState(at index: Int) -> BetaTestCardState? {
+    guard items.indices.contains(index) else { return nil }
+    return items[index].state
+  }
 
-    func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
+  func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
   #endif
 
   // MARK: Private
@@ -187,7 +198,7 @@ final class BetaTestViewController: UIViewController {
     static let buttonCornerRadius: CGFloat = 27.5
   }
 
-  private var items = BetaTestViewController.defaultItems()
+  private var items: [BetaTestItem]
   private var runPhase = RunPhase.idle
   private var runCoordinator = RunCoordinator()
 
@@ -238,7 +249,8 @@ final class BetaTestViewController: UIViewController {
     view.accessibilityIdentifier = "BetaTestViewController.collectionView"
     view.register(
       BetaTestCollectionViewCell.self,
-      forCellWithReuseIdentifier: BetaTestCollectionViewCell.reuseIdentifier)
+      forCellWithReuseIdentifier: BetaTestCollectionViewCell.reuseIdentifier,
+    )
     return view
   }()
 
@@ -281,44 +293,6 @@ final class BetaTestViewController: UIViewController {
     view.accessibilityIdentifier = "BetaTestViewController.continueButtonShadowView"
     return view
   }()
-
-  private static func defaultItems() -> [BetaTestItem] {
-    [
-      makeDefaultItem(title: "Tester", icon: .jailbreak, initialState: .success),
-      makeDefaultItem(title: "CPU", icon: .cpu, initialState: .success),
-      makeDefaultItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
-      makeDefaultItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
-      makeDefaultItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
-      makeDefaultItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
-      makeDefaultItem(title: "Tes Biometric 2", icon: .biometricTwo, initialState: .success),
-      makeDefaultItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
-      makeDefaultItem(title: "Tombol Volume", icon: .volume, initialState: .success),
-      makeDefaultItem(title: "Tombol On/Off", icon: .power, initialState: .success),
-      makeDefaultItem(title: "Tes Kamera", icon: .camera, initialState: .success),
-      makeDefaultItem(title: "Tes Layar Sentuh", icon: .touch, initialState: .success),
-      makeDefaultItem(title: "Tes Kartu SIM", icon: .sim, initialState: .success),
-    ]
-  }
-
-  private static func makeDefaultItem(
-    title: String,
-    icon: BetaTestItem.IconType,
-    initialState: BetaTestCardState,
-    retryState: BetaTestCardState = .success,
-    simulatedDuration: TimeInterval = 0.25,
-  ) -> BetaTestItem {
-    BetaTestItem(
-      title: title,
-      icon: icon,
-      state: .initial,
-      executionHandler: { phase, continueExecutionWithState in
-        let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
-        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
-          continueExecutionWithState(state)
-        }
-      },
-    )
-  }
 
   private func setupObservers() {
     NotificationCenter.default.addObserver(
@@ -399,7 +373,9 @@ final class BetaTestViewController: UIViewController {
         constant: -Layout.buttonHorizontalInset,
       ),
       continueButtonShadowView.topAnchor.constraint(
-        equalTo: bottomOverlayView.topAnchor, constant: Layout.bottomSectionTopInset),
+        equalTo: bottomOverlayView.topAnchor,
+        constant: Layout.bottomSectionTopInset,
+      ),
       continueButtonShadowView.heightAnchor.constraint(
         greaterThanOrEqualToConstant: Layout.buttonHeight),
       continueButtonShadowView.bottomAnchor.constraint(
@@ -655,7 +631,8 @@ extension BetaTestViewController {
   private func adaptiveCardHeight(for itemWidth: CGFloat, at itemIndex: Int) -> CGFloat {
     let contentSizeCategory = traitCollection.preferredContentSizeCategory
     let rowIndex = max(0, itemIndex / Layout.cardsPerRow)
-    if let cachedRowMeasurements,
+    if
+      let cachedRowMeasurements,
       abs(cachedRowMeasurements.width - itemWidth) < 0.5,
       cachedRowMeasurements.contentSizeCategory == contentSizeCategory,
       rowIndex < cachedRowMeasurements.heightsByRow.count

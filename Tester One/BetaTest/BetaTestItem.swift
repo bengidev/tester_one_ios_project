@@ -7,10 +7,11 @@ import Foundation
 
 struct BetaTestItem {
 
-  /// MUST call `continueExecutionWithState(...)` exactly once to continue the sequential chain.
-  typealias ExecutionHandler = (_ phase: ExecutionPhase, _ continueExecutionWithState: @escaping (BetaTestCardState) -> Void) -> Void
-
   // MARK: Internal
+
+  /// MUST call `continueExecutionWithState(...)` exactly once to continue the sequential chain.
+  typealias ExecutionHandler = (_ phase: ExecutionPhase, _ continueExecutionWithState: @escaping (BetaTestCardState) -> Void)
+    -> Void
 
   struct Content {
     var title: String

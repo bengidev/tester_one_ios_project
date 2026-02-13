@@ -39,18 +39,56 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
     window = UIWindow(frame: UIScreen.main.bounds)
     // Set BetaTestViewController as root for design comparison
-    let rootViewController = BetaTestViewController()
+    let rootViewController = BetaTestViewController(items: makeBetaTestItemsForHost())
     rootViewController.onProcessingEvent = { event in
-        if case let .runCompleted(results) = event {
-            print("runCompleted results: \(results)")
-            print("runCompleted last results: \(results.last, default: "")")
-        }
+      if case .runCompleted(let results) = event {
+        print("runCompleted results: \(results)")
+        print("runCompleted last results: \(results.last, default: "")")
+      }
     }
 
     let navigationController = UINavigationController(rootViewController: rootViewController)
     window?.rootViewController = navigationController
     window?.makeKeyAndVisible()
     return true
+  }
+
+  private func makeBetaTestItemsForHost() -> [BetaTestItem] {
+    [
+      makeHostItem(title: "Tester", icon: .jailbreak, initialState: .success),
+      makeHostItem(title: "CPU", icon: .cpu, initialState: .success),
+      makeHostItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
+      makeHostItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
+      makeHostItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
+      makeHostItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
+      makeHostItem(title: "Tes Biometric 2", icon: .biometricTwo, initialState: .success),
+      makeHostItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
+      makeHostItem(title: "Tombol Volume", icon: .volume, initialState: .success),
+      makeHostItem(title: "Tombol On/Off", icon: .power, initialState: .success),
+      makeHostItem(title: "Tes Kamera", icon: .camera, initialState: .success),
+      makeHostItem(title: "Tes Layar Sentuh", icon: .touch, initialState: .success),
+      makeHostItem(title: "Tes Kartu SIM", icon: .sim, initialState: .success),
+    ]
+  }
+
+  private func makeHostItem(
+    title: String,
+    icon: BetaTestItem.IconType,
+    initialState: BetaTestCardState,
+    retryState: BetaTestCardState = .success,
+    simulatedDuration: TimeInterval = 0.25,
+  ) -> BetaTestItem {
+    BetaTestItem(
+      title: title,
+      icon: icon,
+      state: .initial,
+      executionHandler: { phase, continueExecutionWithState in
+        let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
+        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
+          continueExecutionWithState(state)
+        }
+      }
+    )
   }
 
   func applicationDidEnterBackground(_: UIApplication) {

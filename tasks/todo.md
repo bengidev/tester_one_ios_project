@@ -18,3 +18,15 @@
 - [ ] Tune per-cell timings and visuals after manual feedback.
 - [x] Keep a single lifecycle callback surface (`onProcessingEvent`) and avoid redundant completion hooks.
 - [x] Remove temporary debug/demo execution logic from `defaultItems()` (`static var` counters, print-based behavior).
+
+## Phase 3 — BetaTest Modularization Replan (for future extraction)
+- [ ] Define BetaTest public API surface (minimal host-facing types only).
+- [ ] Introduce `BetaTestModuleConfiguration` as a single entry config object.
+- [ ] Replace direct closure sprawl with one host delegate/event stream contract.
+- [ ] Move execution behavior wiring to injectable protocol (`BetaTestExecutionProviding`).
+- [ ] Add factory entrypoint (`BetaTestModule.makeViewController(configuration:)`).
+- [ ] Isolate internal UI/state types as `internal` to avoid API leakage.
+- [ ] Remove AppDelegate debug print wiring; switch to sample integration block.
+- [ ] Add module-level docs (`docs/BetaTestModule.md`) with integration examples.
+- [ ] Add contract tests for module API behavior from host perspective.
+- [ ] Run build + unit tests + manual UI validation as release gate.

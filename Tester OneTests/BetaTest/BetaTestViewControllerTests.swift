@@ -16,14 +16,14 @@ final class Tester_OneTests: XCTestCase {
 
   @MainActor
   func testBeginProcessingTransitionsToFinishedAndReturnsResults() {
-    let sut = BetaTestViewController()
+    let sut = BetaTestViewController(items: makeFixtureItems())
     _ = sut.view
 
     let exp = expectation(description: "processing completed")
     var capturedResults = [BetaTestViewController.ProcessResult]()
 
     sut.onProcessingEvent = { event in
-      if case let .runCompleted(results) = event {
+      if case .runCompleted(let results) = event {
         capturedResults = results
         exp.fulfill()
       }
@@ -40,7 +40,7 @@ final class Tester_OneTests: XCTestCase {
 
   @MainActor
   func testRetryFlowIgnoresStaleCompletionWhenNewRunStarts() {
-    let sut = BetaTestViewController()
+    let sut = BetaTestViewController(items: makeFixtureItems())
     _ = sut.view
 
     // Make index 0 retryable.
@@ -65,7 +65,7 @@ final class Tester_OneTests: XCTestCase {
 
   @MainActor
   func testSetStateNoOpKeepsStateStable() {
-    let sut = BetaTestViewController()
+    let sut = BetaTestViewController(items: makeFixtureItems())
     _ = sut.view
 
     sut.setState(.initial, at: 0)
@@ -76,5 +76,42 @@ final class Tester_OneTests: XCTestCase {
 
     XCTAssertEqual(first, .initial)
     XCTAssertEqual(second, .initial)
+  }
+
+  private func makeFixtureItems() -> [BetaTestItem] {
+    [
+      makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .success),
+      makeFixtureItem(title: "CPU", icon: .cpu, initialState: .success),
+      makeFixtureItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
+      makeFixtureItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
+      makeFixtureItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
+      makeFixtureItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
+      makeFixtureItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
+      makeFixtureItem(title: "Tombol Volume", icon: .volume, initialState: .success),
+      makeFixtureItem(title: "Tombol On/Off", icon: .power, initialState: .success),
+      makeFixtureItem(title: "Tes Kamera", icon: .camera, initialState: .success),
+      makeFixtureItem(title: "Tes Layar Sentuh", icon: .touch, initialState: .success),
+      makeFixtureItem(title: "Tes Kartu SIM", icon: .sim, initialState: .success),
+    ]
+  }
+
+  private func makeFixtureItem(
+    title: String,
+    icon: BetaTestItem.IconType,
+    initialState: BetaTestCardState,
+    retryState: BetaTestCardState = .success,
+    simulatedDuration: TimeInterval = 0.01,
+  ) -> BetaTestItem {
+    BetaTestItem(
+      title: title,
+      icon: icon,
+      state: .initial,
+      executionHandler: { phase, continueExecutionWithState in
+        let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
+        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
+          continueExecutionWithState(state)
+        }
+      }
+    )
   }
 }
