@@ -194,7 +194,7 @@ final class BetaTestViewController: UIViewController {
     static let gridInterItemSpacing: CGFloat = 12
     static let gridLineSpacing: CGFloat = 12
     static let cardsPerRow = 2
-    static let mosaicBigItemCharacterThreshold = 34
+    static let mosaicBigItemMinimumHeight: CGFloat = 220
 
     static let bottomSectionTopInset: CGFloat = 16
     static let bottomSectionBottomInset: CGFloat = 16
@@ -243,9 +243,12 @@ final class BetaTestViewController: UIViewController {
     )
     layout.interItemSpacing = Layout.gridInterItemSpacing
     layout.lineSpacing = Layout.gridLineSpacing
-    layout.rowUnit = 10
-    layout.minimumItemHeight = 110
-    layout.singleColumnBreakpoint = 340
+    layout.rowUnit = 8
+    layout.minimumItemHeight = 120
+    layout.singleColumnBreakpoint = 345
+    layout.overlapTolerance = 0.5
+    layout.bigItemMinimumSpan = 20
+    layout.bigItemMaximumSpan = 42
     return layout
   }()
 
@@ -718,12 +721,24 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
   }
 
   func adaptiveMosaicLayout(
-    _: BetaTestAdaptiveMosaicLayout,
+    _ layout: BetaTestAdaptiveMosaicLayout,
     prefersExpandedItemAt indexPath: IndexPath,
   ) -> Bool {
     guard items.indices.contains(indexPath.item) else { return false }
-    let title = items[indexPath.item].title
-    return title.count >= Layout.mosaicBigItemCharacterThreshold
+
+    let availableWidth = max(
+      0,
+      collectionView.bounds.width - layout.sectionInsets.left - layout.sectionInsets.right
+        - layout.interItemSpacing)
+    let itemWidth = max(0, availableWidth / 2)
+    guard itemWidth > 0 else { return false }
+
+    let preferredHeight = BetaTestCollectionViewCell.preferredHeight(
+      for: itemWidth,
+      title: items[indexPath.item].title,
+      traitCollection: traitCollection,
+    )
+    return preferredHeight >= Layout.mosaicBigItemMinimumHeight
   }
 }
 
