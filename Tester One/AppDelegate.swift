@@ -48,6 +48,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
       )
     )
 
+    configureStateAutomationIfNeeded(for: rootViewController)
+
     let navigationController = UINavigationController(rootViewController: rootViewController)
     window?.rootViewController = navigationController
     window?.makeKeyAndVisible()
@@ -73,6 +75,71 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   // MARK: Private
+
+  private func configureStateAutomationIfNeeded(for viewController: BetaTestViewController) {
+    let env = ProcessInfo.processInfo.environment
+    guard env["BETA_TEST_STATE_AUTOMATION"] == "1" else { return }
+
+    let outputDir = stateSnapshotOutputDirectory()
+    try? FileManager.default.removeItem(at: outputDir)
+    try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+      viewController.beginProcessing()
+
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        self?.captureStateSnapshot(named: "state_loading_run")
+      }
+    }
+
+    viewController.onProcessingEvent = { [weak self, weak viewController] event in
+      guard case .runCompleted(let results) = event else { return }
+      guard let failedResult = results.first(where: { $0.state == .failed }) else { return }
+
+      // Give UIKit an extra frame budget on slower simulators so the bottom button
+      // title/state has time to render before snapshot capture.
+      let settleDelay: TimeInterval = 0.35
+
+      DispatchQueue.main.asyncAfter(deadline: .now() + settleDelay) {
+        self?.captureStateSnapshot(named: "state_failed_after_run")
+      }
+
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + settleDelay) {
+        viewController?.setState(.loading, at: failedResult.index)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+          self?.captureStateSnapshot(named: "state_loading_after_failed")
+        }
+      }
+
+      DispatchQueue.main.asyncAfter(deadline: .now() + 2.6 + settleDelay) {
+        viewController?.setState(.success, at: failedResult.index)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+          self?.captureStateSnapshot(named: "state_success_after_loading")
+        }
+      }
+    }
+  }
+
+  private func stateSnapshotOutputDirectory() -> URL {
+    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+      ?? URL(fileURLWithPath: NSTemporaryDirectory())
+    return docs.appendingPathComponent("state-verify-inapp", isDirectory: true)
+  }
+
+  private func captureStateSnapshot(named: String) {
+    guard let window else { return }
+
+    let renderer = UIGraphicsImageRenderer(bounds: window.bounds)
+    let image = renderer.image { _ in
+      window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+    }
+
+    guard let data = image.pngData() else { return }
+    let fileURL = stateSnapshotOutputDirectory().appendingPathComponent("\(named).png")
+    try? data.write(to: fileURL, options: .atomic)
+  }
 
   private func makeBetaTestItemsForHost() -> [BetaTestModuleConfiguration.Item] {
     [

@@ -119,6 +119,7 @@ final class BetaTestViewController: UIViewController {
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     applyMosaicTuningProfileIfNeeded()
+    applyBottomControlMetricsIfNeeded()
     updateCollectionLayoutIfNeeded()
     updateContinueButtonShadowPathIfNeeded()
   }
@@ -133,6 +134,7 @@ final class BetaTestViewController: UIViewController {
 
     cachedRowMeasurements = nil
     applyMosaicTuningProfileIfNeeded(force: true)
+    applyBottomControlMetricsIfNeeded(force: true)
     collectionView.collectionViewLayout.invalidateLayout()
   }
 
@@ -199,6 +201,15 @@ final class BetaTestViewController: UIViewController {
     let bigItemMinimumHeight: CGFloat
   }
 
+  private struct BottomControlMetrics: Equatable {
+    let horizontalInset: CGFloat
+    let topInset: CGFloat
+    let bottomInset: CGFloat
+    let minimumHeight: CGFloat
+    let verticalContentInset: CGFloat
+    let shadowRadius: CGFloat
+  }
+
   private enum Layout {
     static let contentTopCornerRadius: CGFloat = 30
 
@@ -226,6 +237,13 @@ final class BetaTestViewController: UIViewController {
 
   private var lastCollectionWidth: CGFloat = 0
   private var lastContinueButtonShadowBounds = CGRect.zero
+  private var lastBottomControlMetrics: BottomControlMetrics?
+
+  private var continueButtonShadowLeadingConstraint: NSLayoutConstraint?
+  private var continueButtonShadowTrailingConstraint: NSLayoutConstraint?
+  private var continueButtonShadowTopConstraint: NSLayoutConstraint?
+  private var continueButtonShadowBottomConstraint: NSLayoutConstraint?
+  private var continueButtonShadowMinHeightConstraint: NSLayoutConstraint?
   private var cachedRowMeasurements:
     (
       width: CGFloat,
@@ -400,6 +418,26 @@ final class BetaTestViewController: UIViewController {
   }
 
   private func setupConstraints() {
+    continueButtonShadowLeadingConstraint = continueButtonShadowView.leadingAnchor.constraint(
+      equalTo: bottomOverlayView.leadingAnchor,
+      constant: Layout.buttonHorizontalInset,
+    )
+    continueButtonShadowTrailingConstraint = continueButtonShadowView.trailingAnchor.constraint(
+      equalTo: bottomOverlayView.trailingAnchor,
+      constant: -Layout.buttonHorizontalInset,
+    )
+    continueButtonShadowTopConstraint = continueButtonShadowView.topAnchor.constraint(
+      equalTo: bottomOverlayView.topAnchor,
+      constant: Layout.bottomSectionTopInset,
+    )
+    continueButtonShadowMinHeightConstraint = continueButtonShadowView.heightAnchor.constraint(
+      greaterThanOrEqualToConstant: Layout.buttonHeight
+    )
+    continueButtonShadowBottomConstraint = continueButtonShadowView.bottomAnchor.constraint(
+      equalTo: bottomOverlayView.safeAreaLayoutGuide.bottomAnchor,
+      constant: -Layout.bottomSectionBottomInset,
+    )
+
     NSLayoutConstraint.activate([
       contentContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
       contentContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -415,30 +453,71 @@ final class BetaTestViewController: UIViewController {
       bottomOverlayView.trailingAnchor.constraint(equalTo: contentContainerView.trailingAnchor),
       bottomOverlayView.bottomAnchor.constraint(equalTo: contentContainerView.bottomAnchor),
 
-      continueButtonShadowView.leadingAnchor.constraint(
-        equalTo: bottomOverlayView.leadingAnchor,
-        constant: Layout.buttonHorizontalInset,
-      ),
-      continueButtonShadowView.trailingAnchor.constraint(
-        equalTo: bottomOverlayView.trailingAnchor,
-        constant: -Layout.buttonHorizontalInset,
-      ),
-      continueButtonShadowView.topAnchor.constraint(
-        equalTo: bottomOverlayView.topAnchor,
-        constant: Layout.bottomSectionTopInset,
-      ),
-      continueButtonShadowView.heightAnchor.constraint(
-        greaterThanOrEqualToConstant: Layout.buttonHeight),
-      continueButtonShadowView.bottomAnchor.constraint(
-        equalTo: bottomOverlayView.safeAreaLayoutGuide.bottomAnchor,
-        constant: -Layout.bottomSectionBottomInset,
-      ),
+      continueButtonShadowLeadingConstraint,
+      continueButtonShadowTrailingConstraint,
+      continueButtonShadowTopConstraint,
+      continueButtonShadowMinHeightConstraint,
+      continueButtonShadowBottomConstraint,
 
       continueButton.leadingAnchor.constraint(equalTo: continueButtonShadowView.leadingAnchor),
       continueButton.trailingAnchor.constraint(equalTo: continueButtonShadowView.trailingAnchor),
       continueButton.topAnchor.constraint(equalTo: continueButtonShadowView.topAnchor),
       continueButton.bottomAnchor.constraint(equalTo: continueButtonShadowView.bottomAnchor),
-    ])
+    ].compactMap { $0 })
+  }
+
+  private func bottomControlMetrics(
+    for width: CGFloat,
+    contentSizeCategory: UIContentSizeCategory,
+  ) -> BottomControlMetrics {
+    let widthScale: CGFloat = min(max(width / 390, 0.92), 1.16)
+    let dynamicScaleRaw = UIFontMetrics(forTextStyle: .headline).scaledValue(
+      for: 1,
+      compatibleWith: traitCollection,
+    )
+    let dynamicScale = min(max(dynamicScaleRaw, 1), 1.5)
+
+    let spacingScale = min(max(widthScale * (1 + ((dynamicScale - 1) * 0.25)), 0.92), 1.30)
+    let buttonScale = min(max(widthScale * (1 + ((dynamicScale - 1) * 0.35)), 0.92), 1.35)
+
+    let minimumHeight = max(
+      Layout.buttonHeight * buttonScale,
+      contentSizeCategory.isAccessibilityCategory ? 62 : 0,
+    )
+
+    return BottomControlMetrics(
+      horizontalInset: round(Layout.buttonHorizontalInset * spacingScale),
+      topInset: round(Layout.bottomSectionTopInset * spacingScale),
+      bottomInset: round(Layout.bottomSectionBottomInset * spacingScale),
+      minimumHeight: round(minimumHeight),
+      verticalContentInset: max(8, round(10 * spacingScale)),
+      shadowRadius: max(7, round(9 * spacingScale)),
+    )
+  }
+
+  private func applyBottomControlMetricsIfNeeded(force: Bool = false) {
+    let width = view.bounds.width > 0 ? view.bounds.width : UIScreen.main.bounds.width
+    let metrics = bottomControlMetrics(
+      for: width,
+      contentSizeCategory: traitCollection.preferredContentSizeCategory,
+    )
+
+    guard force || metrics != lastBottomControlMetrics else { return }
+    lastBottomControlMetrics = metrics
+
+    continueButtonShadowLeadingConstraint?.constant = metrics.horizontalInset
+    continueButtonShadowTrailingConstraint?.constant = -metrics.horizontalInset
+    continueButtonShadowTopConstraint?.constant = metrics.topInset
+    continueButtonShadowBottomConstraint?.constant = -metrics.bottomInset
+    continueButtonShadowMinHeightConstraint?.constant = metrics.minimumHeight
+
+    continueButton.contentEdgeInsets = UIEdgeInsets(
+      top: metrics.verticalContentInset,
+      left: 16,
+      bottom: metrics.verticalContentInset,
+      right: 16,
+    )
+    continueButtonShadowView.layer.shadowRadius = metrics.shadowRadius
   }
 
   private func applyMosaicTuningProfileIfNeeded(force: Bool = false) {
@@ -646,23 +725,50 @@ final class BetaTestViewController: UIViewController {
 
     switch phase {
     case .idle:
-      continueButton.setTitle(screen.continueButtonTitleIdle, for: .normal)
-      continueButton.setTitleColor(.white, for: .normal)
-      continueButton.backgroundColor = .betaTestHeaderGreen
-      continueButton.isEnabled = true
+      applyContinueButtonAppearance(
+        title: screen.continueButtonTitleIdle,
+        titleColor: .white,
+        backgroundColor: .betaTestHeaderGreen,
+        isEnabled: true,
+      )
 
     case .processing:
-      continueButton.setTitle(screen.continueButtonTitleLoading, for: .normal)
-      continueButton.setTitleColor(.betaTestLoadingText, for: .normal)
-      continueButton.backgroundColor = .betaTestLoadingBackground
-      continueButton.isEnabled = false
+      applyContinueButtonAppearance(
+        title: screen.continueButtonTitleLoading,
+        titleColor: .betaTestLoadingText,
+        backgroundColor: .betaTestLoadingBackground,
+        isEnabled: false,
+      )
 
     case .finished:
-      continueButton.setTitle(screen.continueButtonTitleFinished, for: .normal)
-      continueButton.setTitleColor(.white, for: .normal)
-      continueButton.backgroundColor = .betaTestHeaderGreen
-      continueButton.isEnabled = true
+      applyContinueButtonAppearance(
+        title: screen.continueButtonTitleFinished,
+        titleColor: .white,
+        backgroundColor: .betaTestHeaderGreen,
+        isEnabled: true,
+      )
     }
+  }
+
+  private func applyContinueButtonAppearance(
+    title: String,
+    titleColor: UIColor,
+    backgroundColor: UIColor,
+    isEnabled: Bool,
+  ) {
+    continueButton.setTitle(title, for: .normal)
+    continueButton.setTitle(title, for: .disabled)
+    continueButton.setTitle(title, for: .highlighted)
+    continueButton.setTitle(title, for: .selected)
+
+    continueButton.setTitleColor(titleColor, for: .normal)
+    continueButton.setTitleColor(titleColor, for: .disabled)
+
+    continueButton.backgroundColor = backgroundColor
+    continueButton.isEnabled = isEnabled
+    continueButton.titleLabel?.isHidden = false
+    continueButton.setNeedsLayout()
+    continueButton.layoutIfNeeded()
   }
 
   private func handleRetryTap(at index: Int) {

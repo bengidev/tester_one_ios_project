@@ -40,7 +40,12 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     let cell = sizingCell
     cell.bounds = CGRect(x: 0, y: 0, width: itemWidth, height: 2000)
     cell.contentView.bounds = cell.bounds
-    cell.applySizingTitle(title, traitCollection: traitCollection)
+    cell.applyScaledMetrics(
+      traitCollection: traitCollection,
+      referenceWidth: itemWidth,
+      force: true,
+    )
+    cell.applySizingTitle(title, traitCollection: traitCollection, referenceWidth: itemWidth)
     cell.setNeedsLayout()
     cell.layoutIfNeeded()
 
@@ -51,7 +56,11 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       verticalFittingPriority: .fittingSizeLevel,
     )
 
-    return ceil(max(measured.height, Layout.minimumMeasuredCardHeight))
+    let minimumHeight = minimumMeasuredCardHeight(
+      for: itemWidth,
+      traitCollection: traitCollection,
+    )
+    return ceil(max(measured.height, minimumHeight))
   }
 
   static func preferredHeightsByRow(
@@ -65,6 +74,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
     var rowHeights = [CGFloat]()
     var startIndex = 0
+    let minimumHeight = minimumMeasuredCardHeight(for: itemWidth, traitCollection: traitCollection)
 
     while startIndex < titles.count {
       let endIndex = min(startIndex + itemsPerRow, titles.count)
@@ -75,18 +85,26 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
           preferredHeight(for: itemWidth, title: title, traitCollection: traitCollection),
         )
       }
-      rowHeights.append(ceil(max(rowMax, Layout.minimumMeasuredCardHeight)))
+      rowHeights.append(ceil(max(rowMax, minimumHeight)))
       startIndex = endIndex
     }
 
     return rowHeights
   }
 
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+
+    guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory
+    else { return }
+
+    applyScaledMetricsIfNeeded(force: true)
+  }
+
   override func preferredLayoutAttributesFitting(
     _ layoutAttributes: UICollectionViewLayoutAttributes
   ) -> UICollectionViewLayoutAttributes {
     let attributes = super.preferredLayoutAttributesFitting(layoutAttributes)
-    // Let Auto Layout determine the exact height needed for the content
     let targetSize = CGSize(
       width: layoutAttributes.size.width,
       height: UIView.layoutFittingCompressedSize.height,
@@ -130,8 +148,10 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    // Update preferredMaxLayoutWidth for proper multiline text sizing
-    let availableWidth = cardView.bounds.width - (Layout.contentInset * 2)
+    applyScaledMetricsIfNeeded()
+
+    // Update preferredMaxLayoutWidth for proper multiline text sizing.
+    let availableWidth = cardView.bounds.width - (currentMetrics?.contentInset ?? Layout.contentInset) * 2
     titleLabel.preferredMaxLayoutWidth = max(0, availableWidth)
   }
 
@@ -166,6 +186,19 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
   // MARK: Private
 
+  private struct ScaledMetrics: Equatable {
+    let cornerRadius: CGFloat
+    let contentInset: CGFloat
+    let titleBottomInset: CGFloat
+    let iconCircleSize: CGFloat
+    let iconSize: CGFloat
+    let statusSize: CGFloat
+    let topRowSpacing: CGFloat
+    let retryHeight: CGFloat
+    let retryVerticalInset: CGFloat
+    let retryHorizontalInset: CGFloat
+  }
+
   private enum Layout {
     static let cornerRadius: CGFloat = 20
     static let cardInset: CGFloat = 0
@@ -196,6 +229,32 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
   private static var fallbackImageCache = [BetaTestItem.IconType: UIImage?]()
   private static let sizingCell = BetaTestCollectionViewCell(frame: .zero)
+
+  private var currentMetrics: ScaledMetrics?
+
+  private var iconCircleLeadingConstraint: NSLayoutConstraint?
+  private var iconCircleTopConstraint: NSLayoutConstraint?
+  private var iconCircleWidthConstraint: NSLayoutConstraint?
+  private var iconCircleHeightConstraint: NSLayoutConstraint?
+
+  private var iconImageWidthConstraint: NSLayoutConstraint?
+  private var iconImageHeightConstraint: NSLayoutConstraint?
+
+  private var statusTrailingConstraint: NSLayoutConstraint?
+  private var statusWidthConstraint: NSLayoutConstraint?
+  private var statusHeightConstraint: NSLayoutConstraint?
+
+  private var loadingTrailingConstraint: NSLayoutConstraint?
+  private var loadingWidthConstraint: NSLayoutConstraint?
+  private var loadingHeightConstraint: NSLayoutConstraint?
+
+  private var retryTrailingConstraint: NSLayoutConstraint?
+  private var retryHeightConstraint: NSLayoutConstraint?
+
+  private var titleLeadingConstraint: NSLayoutConstraint?
+  private var titleTrailingConstraint: NSLayoutConstraint?
+  private var titleTopConstraint: NSLayoutConstraint?
+  private var titleBottomConstraint: NSLayoutConstraint?
 
   private lazy var cardView: UIView = {
     let view = UIView()
@@ -237,9 +296,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     indicator.translatesAutoresizingMaskIntoConstraints = false
     indicator.hidesWhenStopped = true
     indicator.color = UIColor.betaTestDisabledIcon
-    let baseIndicatorSize: CGFloat = 20
-    let scale = Layout.statusSize / baseIndicatorSize
-    indicator.transform = CGAffineTransform(scaleX: scale, y: scale)
     return indicator
   }()
 
@@ -271,7 +327,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     label.numberOfLines = 0
     label.setContentCompressionResistancePriority(.required, for: .vertical)
     label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-    // Critical for multiline labels in self-sizing cells
     label.preferredMaxLayoutWidth = 0
     return label
   }()
@@ -291,46 +346,143 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     return nil
   }
 
-  private static func maxTitleHeight(for titles: [String], width: CGFloat, font: UIFont) -> CGFloat {
-    guard width > 0 else { return ceil(font.lineHeight) }
-
-    // Use actual UILabel for accurate measurement
-    let label = UILabel()
-    label.font = font
-    label.numberOfLines = 0
-    label.preferredMaxLayoutWidth = width
-
-    return titles.reduce(ceil(font.lineHeight)) { currentMax, title in
-      label.text = title
-      let size = label.sizeThatFits(CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
-      return max(currentMax, ceil(size.height))
+  private static func widthScaleFactor(for referenceWidth: CGFloat) -> CGFloat {
+    switch referenceWidth {
+    case ..<145:
+      0.90
+    case ..<170:
+      1.00
+    case ..<190:
+      1.06
+    case ..<215:
+      1.12
+    default:
+      1.16
     }
   }
 
-  private static func semanticCardBottomSpacing(for titleFont: UIFont) -> CGFloat {
-    let proportionalSpacing = ceil(titleFont.lineHeight * 0.20)
-    return min(max(proportionalSpacing, 2), 10)
+  private static func dynamicTypeScale(for traitCollection: UITraitCollection) -> CGFloat {
+    let scale = UIFontMetrics(forTextStyle: .body).scaledValue(for: 1, compatibleWith: traitCollection)
+    return min(max(scale, 1.0), 1.6)
   }
 
-  private func applySizingTitle(_ title: String, traitCollection: UITraitCollection) {
+  private static func minimumMeasuredCardHeight(
+    for referenceWidth: CGFloat,
+    traitCollection: UITraitCollection,
+  ) -> CGFloat {
+    let widthScale = widthScaleFactor(for: referenceWidth)
+    let typeScale = dynamicTypeScale(for: traitCollection)
+    let finalScale = min(max(widthScale * (1 + ((typeScale - 1) * 0.4)), 0.95), 1.5)
+    return ceil(Layout.minimumMeasuredCardHeight * finalScale)
+  }
+
+  private func scaledMetrics(
+    for traitCollection: UITraitCollection,
+    referenceWidth: CGFloat,
+  ) -> ScaledMetrics {
+    let widthScale = Self.widthScaleFactor(for: referenceWidth)
+    let typeScale = Self.dynamicTypeScale(for: traitCollection)
+
+    let componentScale = min(max(widthScale * (1 + ((typeScale - 1) * 0.45)), 0.90), 1.45)
+    let spacingScale = min(max(widthScale * (1 + ((typeScale - 1) * 0.30)), 0.90), 1.35)
+    let cornerScale = min(max(widthScale * (1 + ((typeScale - 1) * 0.20)), 0.90), 1.25)
+
+    return ScaledMetrics(
+      cornerRadius: round(Layout.cornerRadius * cornerScale),
+      contentInset: round(Layout.contentInset * spacingScale),
+      titleBottomInset: round(Layout.titleBottomInset * spacingScale),
+      iconCircleSize: round(Layout.iconCircleSize * componentScale),
+      iconSize: round(Layout.iconSize * componentScale),
+      statusSize: round(Layout.statusSize * componentScale),
+      topRowSpacing: round(Layout.topRowSpacing * spacingScale),
+      retryHeight: round(Layout.retryHeight * componentScale),
+      retryVerticalInset: max(2, round(3 * spacingScale)),
+      retryHorizontalInset: max(10, round(12 * spacingScale)),
+    )
+  }
+
+  private func applyScaledMetricsIfNeeded(force: Bool = false) {
+    let referenceWidth = max(bounds.width, contentView.bounds.width)
+    guard referenceWidth > 0 else { return }
+
+    applyScaledMetrics(
+      traitCollection: traitCollection,
+      referenceWidth: referenceWidth,
+      force: force,
+    )
+  }
+
+  private func applyScaledMetrics(
+    traitCollection: UITraitCollection,
+    referenceWidth: CGFloat,
+    force: Bool,
+  ) {
+    let metrics = scaledMetrics(for: traitCollection, referenceWidth: referenceWidth)
+    guard force || metrics != currentMetrics else { return }
+
+    currentMetrics = metrics
+
+    iconCircleLeadingConstraint?.constant = metrics.contentInset
+    iconCircleTopConstraint?.constant = metrics.contentInset
+    iconCircleWidthConstraint?.constant = metrics.iconCircleSize
+    iconCircleHeightConstraint?.constant = metrics.iconCircleSize
+
+    iconImageWidthConstraint?.constant = metrics.iconSize
+    iconImageHeightConstraint?.constant = metrics.iconSize
+
+    statusTrailingConstraint?.constant = -metrics.contentInset
+    statusWidthConstraint?.constant = metrics.statusSize
+    statusHeightConstraint?.constant = metrics.statusSize
+
+    loadingTrailingConstraint?.constant = -metrics.contentInset
+    loadingWidthConstraint?.constant = metrics.statusSize
+    loadingHeightConstraint?.constant = metrics.statusSize
+
+    retryTrailingConstraint?.constant = -metrics.contentInset
+    retryHeightConstraint?.constant = metrics.retryHeight
+
+    titleLeadingConstraint?.constant = metrics.contentInset
+    titleTrailingConstraint?.constant = -metrics.contentInset
+    titleTopConstraint?.constant = metrics.topRowSpacing
+    titleBottomConstraint?.constant = -metrics.titleBottomInset
+
+    cardView.layer.cornerRadius = metrics.cornerRadius
+    iconCircleView.layer.cornerRadius = metrics.iconCircleSize / 2
+    retryBadgeButton.layer.cornerRadius = metrics.retryHeight / 2
+    retryBadgeButton.contentEdgeInsets = UIEdgeInsets(
+      top: metrics.retryVerticalInset,
+      left: metrics.retryHorizontalInset,
+      bottom: metrics.retryVerticalInset,
+      right: metrics.retryHorizontalInset,
+    )
+
+    let baseIndicatorSize: CGFloat = 20
+    let indicatorScale = max(1.0, metrics.statusSize / baseIndicatorSize)
+    loadingIndicator.transform = CGAffineTransform(scaleX: indicatorScale, y: indicatorScale)
+  }
+
+  private func applySizingTitle(
+    _ title: String,
+    traitCollection: UITraitCollection,
+    referenceWidth: CGFloat,
+  ) {
     let baseFont = UIFont.systemFont(ofSize: 16, weight: .medium)
-    let scaledFont: UIFont =
-      if #available(iOS 11.0, *) {
-        UIFontMetrics(forTextStyle: .body).scaledFont(
-          for: baseFont,
-          compatibleWith: traitCollection,
-        )
-      } else {
-        UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
-      }
+    let scaledFont = UIFontMetrics(forTextStyle: .body).scaledFont(
+      for: baseFont,
+      compatibleWith: traitCollection,
+    )
 
     titleLabel.font = scaledFont
     titleLabel.text = title
     titleLabel.numberOfLines = 0
-    let availableWidth = max(bounds.width - (Layout.contentInset * 2), 1)
+
+    let contentInset = scaledMetrics(
+      for: traitCollection,
+      referenceWidth: referenceWidth,
+    ).contentInset
+    let availableWidth = max(bounds.width - (contentInset * 2), 1)
     titleLabel.preferredMaxLayoutWidth = availableWidth
 
-    // Keep sizing deterministic.
     retryBadgeButton.isHidden = true
     statusImageView.isHidden = true
     loadingIndicator.stopAnimating()
@@ -348,77 +500,94 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     cardView.addSubview(retryBadgeButton)
     cardView.addSubview(titleLabel)
 
-    NSLayoutConstraint.activate([
-      cardView.leadingAnchor.constraint(
-        equalTo: contentView.leadingAnchor,
-        constant: Layout.cardInset,
-      ),
-      cardView.trailingAnchor.constraint(
-        equalTo: contentView.trailingAnchor,
-        constant: -Layout.cardInset,
-      ),
-      cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.cardInset),
-      cardView.bottomAnchor.constraint(
-        equalTo: contentView.bottomAnchor,
-        constant: -Layout.cardInset,
-      ),
+    iconCircleLeadingConstraint = iconCircleView.leadingAnchor.constraint(
+      equalTo: cardView.leadingAnchor,
+      constant: Layout.contentInset,
+    )
+    iconCircleTopConstraint = iconCircleView.topAnchor.constraint(
+      equalTo: cardView.topAnchor,
+      constant: Layout.contentInset,
+    )
+    iconCircleWidthConstraint = iconCircleView.widthAnchor.constraint(equalToConstant: Layout.iconCircleSize)
+    iconCircleHeightConstraint = iconCircleView.heightAnchor.constraint(equalToConstant: Layout.iconCircleSize)
 
-      iconCircleView.leadingAnchor.constraint(
-        equalTo: cardView.leadingAnchor,
-        constant: Layout.contentInset,
-      ),
-      iconCircleView.topAnchor.constraint(
-        equalTo: cardView.topAnchor,
-        constant: Layout.contentInset,
-      ),
-      iconCircleView.widthAnchor.constraint(equalToConstant: Layout.iconCircleSize),
-      iconCircleView.heightAnchor.constraint(equalToConstant: Layout.iconCircleSize),
+    iconImageWidthConstraint = iconImageView.widthAnchor.constraint(equalToConstant: Layout.iconSize)
+    iconImageHeightConstraint = iconImageView.heightAnchor.constraint(equalToConstant: Layout.iconSize)
+
+    statusTrailingConstraint = statusImageView.trailingAnchor.constraint(
+      equalTo: cardView.trailingAnchor,
+      constant: -Layout.contentInset,
+    )
+    statusWidthConstraint = statusImageView.widthAnchor.constraint(equalToConstant: Layout.statusSize)
+    statusHeightConstraint = statusImageView.heightAnchor.constraint(equalToConstant: Layout.statusSize)
+
+    loadingTrailingConstraint = loadingIndicator.trailingAnchor.constraint(
+      equalTo: cardView.trailingAnchor,
+      constant: -Layout.contentInset,
+    )
+    loadingWidthConstraint = loadingIndicator.widthAnchor.constraint(equalToConstant: Layout.statusSize)
+    loadingHeightConstraint = loadingIndicator.heightAnchor.constraint(equalToConstant: Layout.statusSize)
+
+    retryTrailingConstraint = retryBadgeButton.trailingAnchor.constraint(
+      equalTo: cardView.trailingAnchor,
+      constant: -Layout.contentInset,
+    )
+    retryHeightConstraint = retryBadgeButton.heightAnchor.constraint(equalToConstant: Layout.retryHeight)
+
+    titleLeadingConstraint = titleLabel.leadingAnchor.constraint(
+      equalTo: cardView.leadingAnchor,
+      constant: Layout.contentInset,
+    )
+    titleTrailingConstraint = titleLabel.trailingAnchor.constraint(
+      equalTo: cardView.trailingAnchor,
+      constant: -Layout.contentInset,
+    )
+    titleTopConstraint = titleLabel.topAnchor.constraint(
+      equalTo: iconCircleView.bottomAnchor,
+      constant: Layout.topRowSpacing,
+    )
+    titleBottomConstraint = titleLabel.bottomAnchor.constraint(
+      equalTo: cardView.bottomAnchor,
+      constant: -Layout.titleBottomInset,
+    )
+
+    NSLayoutConstraint.activate([
+      cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Layout.cardInset),
+      cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Layout.cardInset),
+      cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.cardInset),
+      cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Layout.cardInset),
+
+      iconCircleLeadingConstraint,
+      iconCircleTopConstraint,
+      iconCircleWidthConstraint,
+      iconCircleHeightConstraint,
 
       iconImageView.centerXAnchor.constraint(equalTo: iconCircleView.centerXAnchor),
       iconImageView.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      iconImageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
-      iconImageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
+      iconImageWidthConstraint,
+      iconImageHeightConstraint,
 
-      statusImageView.trailingAnchor.constraint(
-        equalTo: cardView.trailingAnchor,
-        constant: -Layout.contentInset,
-      ),
+      statusTrailingConstraint,
       statusImageView.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      statusImageView.widthAnchor.constraint(equalToConstant: Layout.statusSize),
-      statusImageView.heightAnchor.constraint(equalToConstant: Layout.statusSize),
+      statusWidthConstraint,
+      statusHeightConstraint,
 
-      loadingIndicator.trailingAnchor.constraint(
-        equalTo: cardView.trailingAnchor,
-        constant: -Layout.contentInset,
-      ),
+      loadingTrailingConstraint,
       loadingIndicator.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      loadingIndicator.widthAnchor.constraint(equalToConstant: Layout.statusSize),
-      loadingIndicator.heightAnchor.constraint(equalToConstant: Layout.statusSize),
+      loadingWidthConstraint,
+      loadingHeightConstraint,
 
-      retryBadgeButton.trailingAnchor.constraint(
-        equalTo: cardView.trailingAnchor,
-        constant: -Layout.contentInset,
-      ),
+      retryTrailingConstraint,
       retryBadgeButton.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      retryBadgeButton.heightAnchor.constraint(equalToConstant: Layout.retryHeight),
+      retryHeightConstraint,
 
-      titleLabel.leadingAnchor.constraint(
-        equalTo: cardView.leadingAnchor,
-        constant: Layout.contentInset,
-      ),
-      titleLabel.trailingAnchor.constraint(
-        equalTo: cardView.trailingAnchor,
-        constant: -Layout.contentInset,
-      ),
-      titleLabel.topAnchor.constraint(
-        equalTo: iconCircleView.bottomAnchor,
-        constant: Layout.topRowSpacing,
-      ),
-      titleLabel.bottomAnchor.constraint(
-        equalTo: cardView.bottomAnchor,
-        constant: -Layout.titleBottomInset,
-      ),
-    ])
+      titleLeadingConstraint,
+      titleTrailingConstraint,
+      titleTopConstraint,
+      titleBottomConstraint,
+    ].compactMap { $0 })
+
+    applyScaledMetricsIfNeeded(force: true)
   }
 
   @objc
@@ -434,13 +603,11 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
     switch state {
     case .initial:
-      // Initial state is neutral grey (not success-green).
       cardView.backgroundColor = UIColor.betaTestInitialCard
       cardView.layer.borderWidth = 0
       iconCircleView.backgroundColor = UIColor.betaTestDisabledCircle
 
     case .loading:
-      // Loading should keep initial styling while showing activity on status position.
       cardView.backgroundColor = UIColor.betaTestDisabledCard
       cardView.layer.borderWidth = 0
       iconCircleView.backgroundColor = UIColor.betaTestDisabledCircle
@@ -452,7 +619,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       cardView.layer.borderColor = UIColor.betaTestSapGreen.cgColor
       cardView.layer.borderWidth = 1
       iconCircleView.backgroundColor = UIColor.betaTestSuccessCircle
-
       statusImageView.isHidden = false
       statusImageView.image = Self.successStatusImage()
 
@@ -461,7 +627,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       cardView.layer.borderColor = UIColor.betaTestErrorRed.cgColor
       cardView.layer.borderWidth = 1
       iconCircleView.backgroundColor = UIColor.betaTestErrorCircle
-
       retryBadgeButton.isHidden = false
     }
   }
@@ -477,13 +642,16 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
         UIColor.betaTestSapGreen
       }
 
-    if #available(iOS 13.0, *), let symbolImage = UIImage(systemName: systemSymbolName(for: icon)) {
-      iconImageView.tintColor = tintColor
-      iconImageView.image = symbolImage.withRenderingMode(.alwaysTemplate)
-      return
+    if #available(iOS 13.0, *) {
+      let pointSize = currentMetrics?.iconSize ?? Layout.iconSize
+      let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
+      if let symbolImage = UIImage(systemName: systemSymbolName(for: icon), withConfiguration: config) {
+        iconImageView.tintColor = tintColor
+        iconImageView.image = symbolImage.withRenderingMode(.alwaysTemplate)
+        return
+      }
     }
 
-    // iOS 12 fallback: choose icon-specific assets when available, then fallback safely.
     if let fallbackImage = fallbackImage(for: icon) {
       iconImageView.tintColor = tintColor
       iconImageView.image = fallbackImage.withRenderingMode(.alwaysTemplate)
