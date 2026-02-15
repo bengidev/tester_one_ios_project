@@ -10,7 +10,14 @@ A minimal UIKit-based iOS app project targeting **iOS 12.0**. This project uses 
 ### Xcode
 Open `Tester One.xcodeproj` and run on a simulator or device.
 
-### CLI
+### CLI scripts (recommended)
+```bash
+./run.sh                 # auto: real device if connected, else simulator
+./run-simulator.sh       # auto-picks an available simulator by UDID
+./run-device.sh          # build + install on connected real device
+```
+
+### Manual CLI build
 ```bash
 xcodebuild \
   -project "Tester One.xcodeproj" \
