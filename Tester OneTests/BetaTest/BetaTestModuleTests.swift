@@ -4,10 +4,8 @@ import XCTest
 // MARK: - BetaTestModuleTests
 
 final class BetaTestModuleTests: XCTestCase {
-  private enum TestTiming {
-    static let timeout: TimeInterval = 3.0
-    static let retryTimeout: TimeInterval = 4.0
-  }
+
+  // MARK: Internal
 
   @MainActor
   func testFactoryCreatesViewControllerWithConfiguredScreenTitle() {
@@ -107,6 +105,7 @@ final class BetaTestModuleTests: XCTestCase {
       case .runCompleted(let results):
         XCTAssertEqual(results.first?.state, .failed)
         runCompleted.fulfill()
+
       default:
         break
       }
@@ -126,6 +125,14 @@ final class BetaTestModuleTests: XCTestCase {
     wait(for: [retryCompleted], timeout: TestTiming.retryTimeout)
     XCTAssertEqual(vc.debug_itemState(at: 0), .success)
   }
+
+  // MARK: Private
+
+  private enum TestTiming {
+    static let timeout: TimeInterval = 3.0
+    static let retryTimeout: TimeInterval = 4.0
+  }
+
 }
 
 // MARK: - MockExecutionProvider
@@ -139,6 +146,8 @@ private final class MockExecutionProvider: BetaTestExecutionProviding {
     completion(.success)
   }
 }
+
+// MARK: - RetryAwareExecutionProvider
 
 private final class RetryAwareExecutionProvider: BetaTestExecutionProviding {
   func execute(

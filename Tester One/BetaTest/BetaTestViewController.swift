@@ -79,6 +79,9 @@ final class BetaTestViewController: UIViewController {
   func beginProcessing() {
     guard runPhase != .processing else { return }
 
+    focusAttemptedIndexes.removeAll(keepingCapacity: true)
+    focusScrolledIndexes.removeAll(keepingCapacity: true)
+
     let runID = runCoordinator.beginProcessingRun()
     setRunPhase(.processing)
     processNextItem(at: 0, runID: runID, results: [])
@@ -156,6 +159,8 @@ final class BetaTestViewController: UIViewController {
   }
 
   func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
+  func debug_focusAttemptedIndexes() -> [Int] { focusAttemptedIndexes }
+  func debug_focusScrolledIndexes() -> [Int] { focusScrolledIndexes }
   #endif
 
   // MARK: Private
@@ -248,6 +253,8 @@ final class BetaTestViewController: UIViewController {
   private var lastCollectionWidth: CGFloat = 0
   private var lastContinueButtonShadowBounds = CGRect.zero
   private var lastBottomControlMetrics: BottomControlMetrics?
+  private var focusAttemptedIndexes = [Int]()
+  private var focusScrolledIndexes = [Int]()
 
   private var continueButtonShadowLeadingConstraint: NSLayoutConstraint?
   private var continueButtonShadowTrailingConstraint: NSLayoutConstraint?
@@ -839,6 +846,8 @@ final class BetaTestViewController: UIViewController {
   private func focusOnItemIfNeeded(at index: Int) {
     guard items.indices.contains(index) else { return }
 
+    focusAttemptedIndexes.append(index)
+
     let indexPath = IndexPath(item: index, section: 0)
     guard collectionView.numberOfSections > 0 else { return }
     guard collectionView.numberOfItems(inSection: 0) > index else { return }
@@ -856,6 +865,7 @@ final class BetaTestViewController: UIViewController {
         }
       }
 
+      focusScrolledIndexes.append(index)
       let animated = !UIAccessibility.isReduceMotionEnabled
       collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: animated)
     }
@@ -971,6 +981,9 @@ extension BetaTestViewController {
 // MARK: BetaTestAdaptiveMosaicLayout.Delegate
 
 extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
+
+  // MARK: Internal
+
   func adaptiveMosaicLayout(
     _: BetaTestAdaptiveMosaicLayout,
     preferredHeightForItemAt indexPath: IndexPath,
@@ -979,8 +992,9 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     guard items.indices.contains(indexPath.item) else { return 110 }
 
     ensureMosaicMeasurements(for: width)
-    if let cachedMosaicMeasurements,
-       let cachedHeight = cachedMosaicMeasurements.heightsByIndex[indexPath.item]
+    if
+      let cachedMosaicMeasurements,
+      let cachedHeight = cachedMosaicMeasurements.heightsByIndex[indexPath.item]
     {
       return cachedHeight
     }
@@ -1007,8 +1021,9 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     guard itemWidth > 0 else { return false }
 
     ensureMosaicMeasurements(for: itemWidth)
-    if let cachedMosaicMeasurements,
-       let isExpanded = cachedMosaicMeasurements.expandedEligibilityByIndex[indexPath.item]
+    if
+      let cachedMosaicMeasurements,
+      let isExpanded = cachedMosaicMeasurements.expandedEligibilityByIndex[indexPath.item]
     {
       return isExpanded
     }
@@ -1021,14 +1036,17 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     return preferredHeight >= mosaicBigItemMinimumHeight
   }
 
+  // MARK: Private
+
   private func ensureMosaicMeasurements(for width: CGFloat) {
     let roundedWidth = round(width * 100) / 100
     let contentSizeCategory = traitCollection.preferredContentSizeCategory
 
-    if let cachedMosaicMeasurements,
-       abs(cachedMosaicMeasurements.width - roundedWidth) < 0.5,
-       cachedMosaicMeasurements.contentSizeCategory == contentSizeCategory,
-       cachedMosaicMeasurements.heightsByIndex.count == items.count
+    if
+      let cachedMosaicMeasurements,
+      abs(cachedMosaicMeasurements.width - roundedWidth) < 0.5,
+      cachedMosaicMeasurements.contentSizeCategory == contentSizeCategory,
+      cachedMosaicMeasurements.heightsByIndex.count == items.count
     {
       return
     }

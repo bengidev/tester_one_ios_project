@@ -168,6 +168,34 @@ final class Tester_OneTests: XCTestCase {
     wait(for: [retryStarted, retryCompleted], timeout: TestTiming.timeout)
   }
 
+  @MainActor
+  func testSmartFollowAttemptsAllItemsAndScrollsForLongDynamicList() {
+    let longItems = (1...24).map { index in
+      makeFixtureItem(
+        title: "Item \(index) lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        icon: .cpu,
+        initialState: .success,
+        simulatedDuration: 0.03,
+      )
+    }
+
+    let sut = BetaTestViewController(items: longItems)
+    _ = sut.view
+
+    let completed = expectation(description: "long run completed")
+    sut.onProcessingEvent = { event in
+      if case .runCompleted = event {
+        completed.fulfill()
+      }
+    }
+
+    sut.beginProcessing()
+    wait(for: [completed], timeout: TestTiming.timeout)
+
+    XCTAssertEqual(sut.debug_focusAttemptedIndexes().count, longItems.count)
+    XCTAssertGreaterThan(sut.debug_focusScrolledIndexes().count, 0)
+  }
+
   // MARK: Private
 
   private enum TestTiming {
@@ -204,13 +232,13 @@ final class Tester_OneTests: XCTestCase {
       icon: icon,
       state: .initial,
       executionHandler: { phase, continueExecutionWithState in
-        let state: BetaTestCardState
-        switch phase {
-        case .initial:
-          state = initialState
-        case .retry:
-          state = retryState
-        }
+        let state: BetaTestCardState =
+          switch phase {
+          case .initial:
+            initialState
+          case .retry:
+            retryState
+          }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
           continueExecutionWithState(state)
