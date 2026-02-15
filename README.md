@@ -22,12 +22,18 @@ xcodebuild \
 ```
 
 ## Tests
+Preferred (auto-picks an available simulator safely):
+```bash
+./run-tests.sh
+```
+
+Manual:
 ```bash
 xcodebuild \
   -project "Tester One.xcodeproj" \
   -scheme "Tester One" \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 14' \
+  -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' \
   test
 ```
 
