@@ -36,9 +36,9 @@
 - [x] Tune for iOS 12-safe performance.
 
 ## Stage 7 — Integration Gate
-- [ ] End-to-end run pass (start → processing → finish).
-- [ ] Failure + retry path pass.
-- [ ] Host-implant checklist + docs update.
+- [x] End-to-end run pass (start → processing → finish).
+- [x] Failure + retry path pass.
+- [x] Host-implant checklist + docs update.
 
 ## Test Timing Policy (Execution-side only, not project default)
 - [x] Use longer async test windows in execution verification when simulator is unstable.

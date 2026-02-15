@@ -45,6 +45,13 @@ let vc = BetaTestModule.makeViewController(
 3. Keep `onProcessingEvent` callback wiring in host layer for analytics and logging.
 4. Keep theming in `BetaTestTheme` and map colors from design tokens.
 
+## Host implant readiness checklist (Stage 7)
+- [x] End-to-end run path verified (`start -> processing -> finish`) through module tests.
+- [x] Failure + retry path verified (`failed -> retry -> success`) through module tests.
+- [x] Host event surface is available for orchestration/analytics (`onProcessingEvent`, `onRetryCompleted`).
+- [x] Layout structure remains concept-safe (no structural redesign required for host implant).
+- [x] Script-level simulator selection hardened for reliable CI/local execution (`run-tests.sh`, `run-simulator.sh`).
+
 ## Notes
 - Card height is driven by multiline title content and measured via Auto Layout sizing cell.
 - Layout is adaptive and remains anchor-constraint-driven across iPhone sizes.
