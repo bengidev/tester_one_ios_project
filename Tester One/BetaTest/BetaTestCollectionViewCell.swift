@@ -169,7 +169,8 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       layoutIfNeeded()
     }
 
-    guard animated else {
+    let shouldAnimate = animated && !UIAccessibility.isReduceMotionEnabled
+    guard shouldAnimate else {
       applyChanges()
       completion?()
       return
@@ -178,7 +179,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     UIView.transition(
       with: cardView,
       duration: 0.24,
-      options: [.transitionCrossDissolve, .allowAnimatedContent, .curveEaseInOut],
+      options: [.transitionCrossDissolve, .allowAnimatedContent, .curveEaseInOut, .beginFromCurrentState, .allowUserInteraction],
       animations: applyChanges,
       completion: { _ in completion?() },
     )

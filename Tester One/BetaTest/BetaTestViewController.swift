@@ -834,7 +834,19 @@ final class BetaTestViewController: UIViewController {
 
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
-      collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
+
+      if
+        let attributes = collectionView.layoutAttributesForItem(at: indexPath)
+      {
+        let visibleRect = CGRect(origin: collectionView.contentOffset, size: collectionView.bounds.size)
+        let comfortRect = visibleRect.insetBy(dx: 0, dy: 40)
+        if comfortRect.contains(attributes.frame) {
+          return
+        }
+      }
+
+      let animated = !UIAccessibility.isReduceMotionEnabled
+      collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: animated)
     }
   }
 

@@ -31,7 +31,7 @@
 - [ ] Snapshot parity rerun after implementation batch.
 
 ## Stage 6 — Non-Breaking Interface Optimization
-- [ ] Polish-only adjustments (typography/spacing/animation/readability) without changing layout structure.
+- [x] Polish-only adjustments (typography/spacing/animation/readability) without changing layout structure.
 - [ ] Profile layout invalidation + cell sizing hot spots.
 - [ ] Tune for iOS 12-safe performance.
 

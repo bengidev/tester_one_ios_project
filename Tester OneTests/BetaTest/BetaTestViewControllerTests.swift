@@ -139,6 +139,35 @@ final class Tester_OneTests: XCTestCase {
     XCTAssertEqual(sut.debug_itemState(at: 0), .failed)
   }
 
+  @MainActor
+  func testRetryEmitsStepStartedWithRetryPhase() {
+    var items = makeFixtureItems()
+    items[0] = makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .failed, retryState: .success)
+
+    let sut = BetaTestViewController(items: items)
+    _ = sut.view
+
+    sut.setState(.failed, at: 0)
+
+    let retryStarted = expectation(description: "retry started event")
+    let retryCompleted = expectation(description: "retry completed")
+
+    sut.onProcessingEvent = { event in
+      switch event {
+      case .stepStarted(let step) where step.index == 0 && step.phase == .retry:
+        retryStarted.fulfill()
+      case .stepCompleted(let result) where result.index == 0 && result.state == .success:
+        retryCompleted.fulfill()
+      default:
+        break
+      }
+    }
+
+    sut.debug_triggerRetry(at: 0)
+
+    wait(for: [retryStarted, retryCompleted], timeout: TestTiming.timeout)
+  }
+
   // MARK: Private
 
   private enum TestTiming {
@@ -175,7 +204,14 @@ final class Tester_OneTests: XCTestCase {
       icon: icon,
       state: .initial,
       executionHandler: { phase, continueExecutionWithState in
-        let state: BetaTestCardState = (phase == .initial) ? initialState : retryState
+        let state: BetaTestCardState
+        switch phase {
+        case .initial:
+          state = initialState
+        case .retry:
+          state = retryState
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
           continueExecutionWithState(state)
         }
