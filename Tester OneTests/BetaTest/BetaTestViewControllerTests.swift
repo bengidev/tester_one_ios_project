@@ -33,7 +33,7 @@ final class Tester_OneTests: XCTestCase {
 
     sut.beginProcessing()
 
-    wait(for: [exp], timeout: 1.0)
+    wait(for: [exp], timeout: TestTiming.timeout)
 
     XCTAssertEqual(sut.debug_runPhase(), .finished)
     XCTAssertEqual(capturedResults.count, 12)
@@ -58,7 +58,7 @@ final class Tester_OneTests: XCTestCase {
         exp.fulfill()
       }
     }
-    wait(for: [exp], timeout: 1.0)
+    wait(for: [exp], timeout: TestTiming.timeout)
 
     // New run should complete using each item's configured execution handler (index 0 success).
     XCTAssertEqual(sut.debug_itemState(at: 0), .success)
@@ -80,7 +80,71 @@ final class Tester_OneTests: XCTestCase {
     XCTAssertEqual(second, .initial)
   }
 
+  @MainActor
+  func testBeginProcessingEmitsStepStartedInOrder() {
+    let sut = BetaTestViewController(items: makeFixtureItems())
+    _ = sut.view
+
+    let exp = expectation(description: "run completed")
+    var startedIndexes = [Int]()
+
+    sut.onProcessingEvent = { event in
+      switch event {
+      case .stepStarted(let step):
+        startedIndexes.append(step.index)
+      case .runCompleted:
+        exp.fulfill()
+      default:
+        break
+      }
+    }
+
+    sut.beginProcessing()
+    wait(for: [exp], timeout: TestTiming.timeout)
+
+    XCTAssertEqual(startedIndexes, Array(0..<12))
+  }
+
+  @MainActor
+  func testRetryIgnoredWhileProcessingRunIsActive() {
+    var items = makeFixtureItems()
+    items[0] = makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .failed, simulatedDuration: 0.10)
+
+    let sut = BetaTestViewController(items: items)
+    _ = sut.view
+
+    let runCompleted = expectation(description: "run completed")
+    let retryShouldNotFire = expectation(description: "retry callback should stay idle")
+    retryShouldNotFire.isInverted = true
+
+    sut.onRetryCompleted = { _ in
+      retryShouldNotFire.fulfill()
+    }
+
+    sut.onProcessingEvent = { event in
+      switch event {
+      case .stepCompleted(let result) where result.index == 0:
+        sut.debug_triggerRetry(at: 0)
+      case .runCompleted:
+        runCompleted.fulfill()
+      default:
+        break
+      }
+    }
+
+    sut.beginProcessing()
+
+    wait(for: [runCompleted], timeout: TestTiming.timeout)
+    wait(for: [retryShouldNotFire], timeout: TestTiming.settle)
+    XCTAssertEqual(sut.debug_itemState(at: 0), .failed)
+  }
+
   // MARK: Private
+
+  private enum TestTiming {
+    static let settle: TimeInterval = 0.10
+    static let timeout: TimeInterval = 3.0
+  }
 
   private func makeFixtureItems() -> [BetaTestItem] {
     [

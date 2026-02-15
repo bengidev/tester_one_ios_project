@@ -25,6 +25,12 @@ final class BetaTestViewController: UIViewController {
     let state: BetaTestCardState
   }
 
+  struct ProcessStep {
+    let index: Int
+    let title: String
+    let phase: BetaTestItem.ExecutionPhase
+  }
+
   enum RunPhase: Equatable {
     case idle
     case processing
@@ -32,6 +38,7 @@ final class BetaTestViewController: UIViewController {
   }
 
   enum ProcessingEvent {
+    case stepStarted(ProcessStep)
     case stepCompleted(ProcessResult)
     case runCompleted([ProcessResult])
   }
@@ -773,6 +780,7 @@ final class BetaTestViewController: UIViewController {
 
   private func handleRetryTap(at index: Int) {
     guard items.indices.contains(index) else { return }
+    guard runPhase != .processing else { return }
     guard items[index].state == .failed else { return }
     guard runCoordinator.isRetryIdle(at: index) else { return }
 
@@ -797,6 +805,10 @@ final class BetaTestViewController: UIViewController {
   ) {
     guard items.indices.contains(index) else { return }
 
+    let title = items[index].title
+    onProcessingEvent?(.stepStarted(.init(index: index, title: title, phase: phase)))
+    focusOnItemIfNeeded(at: index)
+
     updateItemState(.loading, at: index, animated: true) { [weak self] in
       guard let self else { return }
       guard items.indices.contains(index) else { return }
@@ -810,6 +822,19 @@ final class BetaTestViewController: UIViewController {
           completion(ProcessResult(index: index, title: title, state: finalState))
         }
       }
+    }
+  }
+
+  private func focusOnItemIfNeeded(at index: Int) {
+    guard items.indices.contains(index) else { return }
+
+    let indexPath = IndexPath(item: index, section: 0)
+    guard collectionView.numberOfSections > 0 else { return }
+    guard collectionView.numberOfItems(inSection: 0) > index else { return }
+
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
     }
   }
 
