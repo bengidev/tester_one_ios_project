@@ -32,8 +32,8 @@
 
 ## Stage 6 — Non-Breaking Interface Optimization
 - [x] Polish-only adjustments (typography/spacing/animation/readability) without changing layout structure.
-- [ ] Profile layout invalidation + cell sizing hot spots.
-- [ ] Tune for iOS 12-safe performance.
+- [x] Profile layout invalidation + cell sizing hot spots.
+- [x] Tune for iOS 12-safe performance.
 
 ## Stage 7 — Integration Gate
 - [ ] End-to-end run pass (start → processing → finish).

@@ -98,6 +98,8 @@ final class BetaTestViewController: UIViewController {
   func updateItemContent(at index: Int, mutate: (inout BetaTestItem.Content) -> Void) {
     guard items.indices.contains(index) else { return }
     mutate(&items[index].content)
+    cachedRowMeasurements = nil
+    cachedMosaicMeasurements = nil
     reloadItem(at: index)
   }
 
@@ -140,6 +142,7 @@ final class BetaTestViewController: UIViewController {
     else { return }
 
     cachedRowMeasurements = nil
+    cachedMosaicMeasurements = nil
     applyMosaicTuningProfileIfNeeded(force: true)
     applyBottomControlMetricsIfNeeded(force: true)
     collectionView.collectionViewLayout.invalidateLayout()
@@ -256,6 +259,13 @@ final class BetaTestViewController: UIViewController {
       width: CGFloat,
       contentSizeCategory: UIContentSizeCategory,
       heightsByRow: [CGFloat],
+    )?
+  private var cachedMosaicMeasurements:
+    (
+      width: CGFloat,
+      contentSizeCategory: UIContentSizeCategory,
+      heightsByIndex: [Int: CGFloat],
+      expandedEligibilityByIndex: [Int: Bool],
     )?
 
   private lazy var uniformGridLayout: UICollectionViewFlowLayout = {
@@ -627,6 +637,7 @@ final class BetaTestViewController: UIViewController {
     guard abs(collectionWidth - lastCollectionWidth) > 0.5 else { return }
     lastCollectionWidth = collectionWidth
     cachedRowMeasurements = nil
+    cachedMosaicMeasurements = nil
 
     collectionView.collectionViewLayout.invalidateLayout()
   }
@@ -966,6 +977,14 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     fitting width: CGFloat,
   ) -> CGFloat {
     guard items.indices.contains(indexPath.item) else { return 110 }
+
+    ensureMosaicMeasurements(for: width)
+    if let cachedMosaicMeasurements,
+       let cachedHeight = cachedMosaicMeasurements.heightsByIndex[indexPath.item]
+    {
+      return cachedHeight
+    }
+
     return BetaTestCollectionViewCell.preferredHeight(
       for: width,
       title: items[indexPath.item].title,
@@ -987,12 +1006,52 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     let itemWidth = max(0, availableWidth / 2)
     guard itemWidth > 0 else { return false }
 
+    ensureMosaicMeasurements(for: itemWidth)
+    if let cachedMosaicMeasurements,
+       let isExpanded = cachedMosaicMeasurements.expandedEligibilityByIndex[indexPath.item]
+    {
+      return isExpanded
+    }
+
     let preferredHeight = BetaTestCollectionViewCell.preferredHeight(
       for: itemWidth,
       title: items[indexPath.item].title,
       traitCollection: traitCollection,
     )
     return preferredHeight >= mosaicBigItemMinimumHeight
+  }
+
+  private func ensureMosaicMeasurements(for width: CGFloat) {
+    let roundedWidth = round(width * 100) / 100
+    let contentSizeCategory = traitCollection.preferredContentSizeCategory
+
+    if let cachedMosaicMeasurements,
+       abs(cachedMosaicMeasurements.width - roundedWidth) < 0.5,
+       cachedMosaicMeasurements.contentSizeCategory == contentSizeCategory,
+       cachedMosaicMeasurements.heightsByIndex.count == items.count
+    {
+      return
+    }
+
+    var heightsByIndex = [Int: CGFloat]()
+    var expandedEligibilityByIndex = [Int: Bool]()
+
+    for index in items.indices {
+      let preferredHeight = BetaTestCollectionViewCell.preferredHeight(
+        for: roundedWidth,
+        title: items[index].title,
+        traitCollection: traitCollection,
+      )
+      heightsByIndex[index] = preferredHeight
+      expandedEligibilityByIndex[index] = preferredHeight >= mosaicBigItemMinimumHeight
+    }
+
+    cachedMosaicMeasurements = (
+      width: roundedWidth,
+      contentSizeCategory: contentSizeCategory,
+      heightsByIndex: heightsByIndex,
+      expandedEligibilityByIndex: expandedEligibilityByIndex,
+    )
   }
 }
 
