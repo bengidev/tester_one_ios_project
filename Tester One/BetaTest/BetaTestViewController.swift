@@ -269,6 +269,8 @@ final class BetaTestViewController: UIViewController {
   private var lastBottomControlMetrics: BottomControlMetrics?
   private var focusAttemptedIndexes = [Int]()
   private var focusScrolledIndexes = [Int]()
+  private var pendingReloadIndexPaths = Set<IndexPath>()
+  private var isReloadBatchScheduled = false
 
   private var continueButtonShadowLeadingConstraint: NSLayoutConstraint?
   private var continueButtonShadowTrailingConstraint: NSLayoutConstraint?
@@ -692,20 +694,25 @@ final class BetaTestViewController: UIViewController {
   }
 
   private func updateAllItemStates(_ state: BetaTestCardState) {
+    var nonVisibleIndexPaths = [IndexPath]()
+
     for index in items.indices {
       items[index].state = state
-      updateItemState(
-        state,
-        at: index,
-        animated: false,
-        completion: nil,
-      )
+
+      let indexPath = IndexPath(item: index, section: 0)
+      if let cell = collectionView.cellForItem(at: indexPath) as? BetaTestCollectionViewCell {
+        cell.transition(to: state, item: items[index], animated: false, completion: nil)
+      } else {
+        nonVisibleIndexPaths.append(indexPath)
+      }
     }
+
+    reloadItemsInBatch(nonVisibleIndexPaths)
   }
 
   private func reloadItem(at index: Int) {
     guard items.indices.contains(index) else { return }
-    collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+    reloadItemsInBatch([IndexPath(item: index, section: 0)])
   }
 
   private func updateItemState(
@@ -727,8 +734,46 @@ final class BetaTestViewController: UIViewController {
       return
     }
 
-    collectionView.reloadItems(at: [indexPath])
+    enqueueReload(at: indexPath)
     completion?()
+  }
+
+  private func enqueueReload(at indexPath: IndexPath) {
+    guard indexPath.section == 0 else { return }
+    guard indexPath.item >= 0, indexPath.item < items.count else { return }
+
+    pendingReloadIndexPaths.insert(indexPath)
+    guard !isReloadBatchScheduled else { return }
+
+    isReloadBatchScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      self?.flushPendingReloads()
+    }
+  }
+
+  private func flushPendingReloads() {
+    guard isReloadBatchScheduled else { return }
+
+    isReloadBatchScheduled = false
+    let indexPaths = pendingReloadIndexPaths
+      .filter { $0.section == 0 && $0.item >= 0 && $0.item < items.count }
+      .sorted { lhs, rhs in
+        if lhs.section == rhs.section {
+          return lhs.item < rhs.item
+        }
+        return lhs.section < rhs.section
+      }
+
+    pendingReloadIndexPaths.removeAll(keepingCapacity: true)
+    reloadItemsInBatch(indexPaths)
+  }
+
+  private func reloadItemsInBatch(_ indexPaths: [IndexPath]) {
+    guard !indexPaths.isEmpty else { return }
+
+    collectionView.performBatchUpdates {
+      collectionView.reloadItems(at: indexPaths)
+    }
   }
 
   private func processNextItem(

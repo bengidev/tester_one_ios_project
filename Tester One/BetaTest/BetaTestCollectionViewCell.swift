@@ -27,6 +27,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
   static func clearFallbackImageCache() {
     fallbackImageCache.removeAll()
+    preferredHeightCache.removeAll()
   }
 
   static func preferredHeight(
@@ -36,20 +37,30 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   ) -> CGFloat {
     guard itemWidth > 0 else { return 0 }
 
+    let roundedWidth = (itemWidth * 100).rounded() / 100
+    let cacheKey = PreferredHeightCacheKey(
+      roundedWidthKey: Int((roundedWidth * 100).rounded()),
+      contentSizeCategory: traitCollection.preferredContentSizeCategory,
+      title: title,
+    )
+    if let cachedHeight = preferredHeightCache[cacheKey] {
+      return cachedHeight
+    }
+
     // Use an offscreen sizing cell so measured height exactly matches runtime Auto Layout.
     let cell = sizingCell
-    cell.bounds = CGRect(x: 0, y: 0, width: itemWidth, height: 2000)
+    cell.bounds = CGRect(x: 0, y: 0, width: roundedWidth, height: 2000)
     cell.contentView.bounds = cell.bounds
     cell.applyScaledMetrics(
       traitCollection: traitCollection,
-      referenceWidth: itemWidth,
+      referenceWidth: roundedWidth,
       force: true,
     )
-    cell.applySizingTitle(title, traitCollection: traitCollection, referenceWidth: itemWidth)
+    cell.applySizingTitle(title, traitCollection: traitCollection, referenceWidth: roundedWidth)
     cell.setNeedsLayout()
     cell.layoutIfNeeded()
 
-    let target = CGSize(width: itemWidth, height: UIView.layoutFittingCompressedSize.height)
+    let target = CGSize(width: roundedWidth, height: UIView.layoutFittingCompressedSize.height)
     let measured = cell.contentView.systemLayoutSizeFitting(
       target,
       withHorizontalFittingPriority: .required,
@@ -57,10 +68,16 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     )
 
     let minimumHeight = minimumMeasuredCardHeight(
-      for: itemWidth,
+      for: roundedWidth,
       traitCollection: traitCollection,
     )
-    return ceil(max(measured.height, minimumHeight))
+
+    let resolvedHeight = ceil(max(measured.height, minimumHeight))
+    if preferredHeightCache.count > 2000 {
+      preferredHeightCache.removeAll(keepingCapacity: true)
+    }
+    preferredHeightCache[cacheKey] = resolvedHeight
+    return resolvedHeight
   }
 
   static func preferredHeightsByRow(
@@ -205,6 +222,12 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     let retryHorizontalInset: CGFloat
   }
 
+  private struct PreferredHeightCacheKey: Hashable {
+    let roundedWidthKey: Int
+    let contentSizeCategory: UIContentSizeCategory
+    let title: String
+  }
+
   private enum Layout {
     static let cornerRadius: CGFloat = 20
     static let cardInset: CGFloat = 0
@@ -234,6 +257,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   ]
 
   private static var fallbackImageCache = [BetaTestItem.IconType: UIImage?]()
+  private static var preferredHeightCache = [PreferredHeightCacheKey: CGFloat]()
   private static let sizingCell = BetaTestCollectionViewCell(frame: .zero)
 
   private var currentMetrics: ScaledMetrics?
