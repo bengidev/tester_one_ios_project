@@ -147,11 +147,32 @@ This document records the BetaTest optimization journey in chronological order s
 - Reduces collection reload churn and layout invalidation bursts.
 - Preserves visible animation behavior while reducing background update overhead.
 
+### 4.3 Retry Interaction Re-Sync on Cell Reappearance (post-batch fix)
+
+**Files:**
+- `Tester One/BetaTest/BetaTestViewController.swift`
+
+**Issue observed manually:**
+- After processing finished, item 0 could remain untappable on retry when it returned as failed.
+
+**Root cause:**
+- Retry interaction lock/unlock was only applied to currently visible cells.
+- When a cell (especially item 0) left the viewport during processing and later reappeared, its retry button could keep stale `isUserInteractionEnabled = false`.
+
+**Fix applied:**
+- Added `collectionView(_:willDisplay:forItemAt:)` hook to re-apply current retry interaction state whenever any cell becomes visible.
+- This ensures offscreen->onscreen cells always sync with controller-level `isRetryInteractionEnabled`.
+
+**Why this matters:**
+- Removes a stale-state edge case without changing visual behavior or run flow.
+- Keeps retry interaction deterministic after auto-scroll driven processing.
+
 ## 5) Verification Record
 
 - Local verification command: `./run-tests.sh`
 - Latest result for this batch: passed (`** TEST SUCCEEDED **`, `✅ Tests completed!`)
 - Note: SourceKit diagnostics in this shell may report `No such module 'UIKit'`, while Xcode build/test pipeline compiles and passes through `xcodebuild`.
+- For the post-batch retry-interaction re-sync fix, simulator validation was intentionally skipped by request; manual validation is expected by the owner.
 
 ## 6) How to Explain This to Others (simple script)
 

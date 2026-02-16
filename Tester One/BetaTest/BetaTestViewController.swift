@@ -992,6 +992,15 @@ extension BetaTestViewController: UICollectionViewDataSource {
 
 extension BetaTestViewController: UICollectionViewDelegateFlowLayout {
   func collectionView(
+    _: UICollectionView,
+    willDisplay cell: UICollectionViewCell,
+    forItemAt _: IndexPath,
+  ) {
+    guard let betaCell = cell as? BetaTestCollectionViewCell else { return }
+    betaCell.setRetryInteractionEnabled(isRetryInteractionEnabled)
+  }
+
+  func collectionView(
     _ collectionView: UICollectionView,
     layout _: UICollectionViewLayout,
     sizeForItemAt indexPath: IndexPath,
