@@ -205,14 +205,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   private func makeBetaTestItemsForHost() -> [BetaTestModuleConfiguration.Item] {
     [
       makeHostItem(
-        title: "Neque porro quis ",
+        title: "Convex is the open source, reactive database where queries are TypeScript code running right in the database. Just like React components react to state changes, Convex queries react to database changes.",
         icon: .cpu,
-        initialState: .success,
+        initialState: .failed,
       ),
-      makeHostItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
+      makeHostItem(title: "When you're ready to move toward production for your app, you can setup your Xcode build system to point different build targets to different Convex deployments.", icon: .hardDisk, initialState: .failed),
       makeHostItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
       makeHostItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
-      makeHostItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
+      makeHostItem(title: "Build environment configuration is highly specialized, and it’s possible that you or your team have different conventions, but this is one way to approach the problem.", icon: .biometricOne, initialState: .failed),
       makeHostItem(title: "Tes Biometric 2", icon: .biometricTwo, initialState: .success),
       makeHostItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
       makeHostItem(title: "Tombol Volume", icon: .volume, initialState: .success),
