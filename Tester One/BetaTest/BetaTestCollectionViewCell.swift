@@ -124,6 +124,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     retryBadgeButton.isHidden = true
     statusImageView.isHidden = true
     loadingIndicator.stopAnimating()
+    setRetryInteractionEnabled(true)
     onRetryTapped = nil
   }
 
@@ -183,6 +184,10 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       animations: applyChanges,
       completion: { _ in completion?() },
     )
+  }
+
+  func setRetryInteractionEnabled(_ isEnabled: Bool) {
+    retryBadgeButton.isUserInteractionEnabled = isEnabled
   }
 
   // MARK: Private
@@ -593,6 +598,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
 
   @objc
   private func handleRetryButtonTap() {
+    guard retryBadgeButton.isUserInteractionEnabled else { return }
     onRetryTapped?()
   }
 

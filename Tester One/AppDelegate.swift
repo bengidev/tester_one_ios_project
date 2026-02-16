@@ -84,12 +84,73 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     try? FileManager.default.removeItem(at: outputDir)
     try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+    let retryAllMode = env["BETA_TEST_RETRY_ALL_AUTOMATION"] == "1"
+
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
       viewController.beginProcessing()
 
       DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
         self?.captureStateSnapshot(named: "state_loading_run")
       }
+    }
+
+    if retryAllMode {
+      var retryQueue = [Int]()
+      var isRetryFlowRunning = false
+
+      func runNextRetryIfNeeded(_ vc: BetaTestViewController?) {
+        guard let vc else { return }
+        guard !isRetryFlowRunning else { return }
+        guard !retryQueue.isEmpty else { return }
+
+        isRetryFlowRunning = true
+        let nextIndex = retryQueue.removeFirst()
+        vc.debug_triggerRetry(at: nextIndex)
+      }
+
+      viewController.onRetryCompleted = { [weak viewController] _ in
+        isRetryFlowRunning = false
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+          runNextRetryIfNeeded(viewController)
+        }
+      }
+
+      viewController.onProcessingEvent = { [weak self, weak viewController] event in
+        guard case .runCompleted(let results) = event else { return }
+        guard let vc = viewController else { return }
+
+        let failedIndexes = results
+          .filter { $0.state == .failed }
+          .map(\.index)
+          .sorted()
+
+        guard !failedIndexes.isEmpty else { return }
+
+        retryQueue = failedIndexes
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+          vc.debug_scrollToBottom(animated: true)
+
+          DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            vc.debug_scrollToMiddle(animated: true)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+              vc.debug_scrollToTop(animated: true)
+
+              DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                runNextRetryIfNeeded(viewController)
+              }
+            }
+          }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+          self?.captureStateSnapshot(named: "state_failed_after_run")
+        }
+      }
+
+      return
     }
 
     viewController.onProcessingEvent = { [weak self, weak viewController] event in
@@ -144,11 +205,11 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   private func makeBetaTestItemsForHost() -> [BetaTestModuleConfiguration.Item] {
     [
       makeHostItem(
-        title: "Neque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velitNeque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velitNeque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit",
+        title: "Neque porro quis ",
         icon: .cpu,
-        initialState: .failed,
+        initialState: .success,
       ),
-      makeHostItem(title: "Hard Disk", icon: .hardDisk, initialState: .failed),
+      makeHostItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
       makeHostItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
       makeHostItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
       makeHostItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
@@ -166,7 +227,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     title: String,
     icon: BetaTestItem.IconType,
     initialState: BetaTestCardState,
-    retryState: BetaTestCardState = .success,
+    retryState: BetaTestCardState = .failed,
     simulatedDuration: TimeInterval = 0.25,
   ) -> BetaTestModuleConfiguration.Item {
     BetaTestModuleConfiguration.Item(

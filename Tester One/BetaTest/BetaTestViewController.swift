@@ -161,6 +161,20 @@ final class BetaTestViewController: UIViewController {
   func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
   func debug_focusAttemptedIndexes() -> [Int] { focusAttemptedIndexes }
   func debug_focusScrolledIndexes() -> [Int] { focusScrolledIndexes }
+  func debug_scrollToBottom(animated: Bool) {
+    let maxOffsetY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
+    collectionView.setContentOffset(CGPoint(x: 0, y: maxOffsetY), animated: animated)
+  }
+
+  func debug_scrollToTop(animated: Bool) {
+    collectionView.setContentOffset(CGPoint(x: 0, y: -collectionView.adjustedContentInset.top), animated: animated)
+  }
+
+  func debug_scrollToMiddle(animated: Bool) {
+    let maxOffsetY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
+    let middleOffsetY = maxOffsetY * 0.5
+    collectionView.setContentOffset(CGPoint(x: 0, y: middleOffsetY), animated: animated)
+  }
   #endif
 
   // MARK: Private
@@ -248,6 +262,7 @@ final class BetaTestViewController: UIViewController {
   private var mosaicBigItemMinimumHeight: CGFloat = 220
   private var lastAppliedMosaicProfile: MosaicTuningProfile?
   private var runPhase = RunPhase.idle
+  private var isRetryInteractionEnabled = true
   private var runCoordinator = RunCoordinator()
 
   private var lastCollectionWidth: CGFloat = 0
@@ -747,6 +762,7 @@ final class BetaTestViewController: UIViewController {
 
   private func setRunPhase(_ phase: RunPhase) {
     runPhase = phase
+    setInteractionLock(isLocked: phase == .processing)
 
     switch phase {
     case .idle:
@@ -794,6 +810,19 @@ final class BetaTestViewController: UIViewController {
     continueButton.titleLabel?.isHidden = false
     continueButton.setNeedsLayout()
     continueButton.layoutIfNeeded()
+  }
+
+  private func setInteractionLock(isLocked: Bool) {
+    let isInteractionEnabled = !isLocked
+    isRetryInteractionEnabled = isInteractionEnabled
+    collectionView.isScrollEnabled = isInteractionEnabled
+    updateVisibleRetryInteractions()
+  }
+
+  private func updateVisibleRetryInteractions() {
+    for case let cell as BetaTestCollectionViewCell in collectionView.visibleCells {
+      cell.setRetryInteractionEnabled(isRetryInteractionEnabled)
+    }
   }
 
   private func handleRetryTap(at index: Int) {
@@ -911,6 +940,7 @@ extension BetaTestViewController: UICollectionViewDataSource {
     }
 
     betaCell.configure(with: items[indexPath.item])
+    betaCell.setRetryInteractionEnabled(isRetryInteractionEnabled)
     betaCell.onRetryTapped = { [weak self, weak betaCell, weak collectionView] in
       guard let self, let betaCell, let collectionView else { return }
       guard let resolvedIndexPath = collectionView.indexPath(for: betaCell) else { return }
