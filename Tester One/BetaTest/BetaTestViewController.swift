@@ -223,7 +223,6 @@ final class BetaTestViewController: UIViewController {
   private struct MosaicTuningProfile: Equatable {
     let rowUnit: CGFloat
     let minimumItemHeight: CGFloat
-    let singleColumnBreakpoint: CGFloat
     let overlapTolerance: CGFloat
     let bigItemMinimumSpan: Int
     let bigItemMaximumSpan: Int
@@ -286,8 +285,8 @@ final class BetaTestViewController: UIViewController {
     (
       width: CGFloat,
       contentSizeCategory: UIContentSizeCategory,
-      heightsByIndex: [Int: CGFloat],
-      expandedEligibilityByIndex: [Int: Bool],
+      heightsByIndex: [CGFloat],
+      expandedEligibilityByIndex: [Bool],
     )?
 
   private lazy var uniformGridLayout: UICollectionViewFlowLayout = {
@@ -318,7 +317,6 @@ final class BetaTestViewController: UIViewController {
     layout.lineSpacing = Layout.gridLineSpacing
     layout.rowUnit = 8
     layout.minimumItemHeight = 120
-    layout.singleColumnBreakpoint = 345
     layout.overlapTolerance = 0.5
     layout.bigItemMinimumSpan = 20
     layout.bigItemMaximumSpan = 42
@@ -570,7 +568,6 @@ final class BetaTestViewController: UIViewController {
 
     adaptiveMosaicLayout.rowUnit = profile.rowUnit
     adaptiveMosaicLayout.minimumItemHeight = profile.minimumItemHeight
-    adaptiveMosaicLayout.singleColumnBreakpoint = profile.singleColumnBreakpoint
     adaptiveMosaicLayout.overlapTolerance = profile.overlapTolerance
     adaptiveMosaicLayout.bigItemMinimumSpan = profile.bigItemMinimumSpan
     adaptiveMosaicLayout.bigItemMaximumSpan = profile.bigItemMaximumSpan
@@ -608,7 +605,6 @@ final class BetaTestViewController: UIViewController {
       return MosaicTuningProfile(
         rowUnit: 10,
         minimumItemHeight: 160,
-        singleColumnBreakpoint: 0, // NEVER use 1-column
         overlapTolerance: 1.0,
         bigItemMinimumSpan: 20,
         bigItemMaximumSpan: 44,
@@ -621,7 +617,6 @@ final class BetaTestViewController: UIViewController {
       return MosaicTuningProfile(
         rowUnit: 6, // Smaller grid unit
         minimumItemHeight: 90, // Smaller cards for narrow screens
-        singleColumnBreakpoint: 0, // Force 2-column
         overlapTolerance: 0.5,
         bigItemMinimumSpan: 14, // Smaller big cards (140pt min)
         bigItemMaximumSpan: 28, // Cap expansion
@@ -633,7 +628,6 @@ final class BetaTestViewController: UIViewController {
       return MosaicTuningProfile(
         rowUnit: 8,
         minimumItemHeight: 120,
-        singleColumnBreakpoint: 0, // NEVER use 1-column
         overlapTolerance: 0.5,
         bigItemMinimumSpan: 20,
         bigItemMaximumSpan: 42,
@@ -645,7 +639,6 @@ final class BetaTestViewController: UIViewController {
     return MosaicTuningProfile(
       rowUnit: 10,
       minimumItemHeight: 120,
-      singleColumnBreakpoint: 0, // NEVER use 1-column
       overlapTolerance: 1.0,
       bigItemMinimumSpan: 20,
       bigItemMaximumSpan: 50,
@@ -1024,9 +1017,9 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     ensureMosaicMeasurements(for: width)
     if
       let cachedMosaicMeasurements,
-      let cachedHeight = cachedMosaicMeasurements.heightsByIndex[indexPath.item]
+      indexPath.item < cachedMosaicMeasurements.heightsByIndex.count
     {
-      return cachedHeight
+      return cachedMosaicMeasurements.heightsByIndex[indexPath.item]
     }
 
     return BetaTestCollectionViewCell.preferredHeight(
@@ -1053,9 +1046,9 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     ensureMosaicMeasurements(for: itemWidth)
     if
       let cachedMosaicMeasurements,
-      let isExpanded = cachedMosaicMeasurements.expandedEligibilityByIndex[indexPath.item]
+      indexPath.item < cachedMosaicMeasurements.expandedEligibilityByIndex.count
     {
-      return isExpanded
+      return cachedMosaicMeasurements.expandedEligibilityByIndex[indexPath.item]
     }
 
     let preferredHeight = BetaTestCollectionViewCell.preferredHeight(
@@ -1081,8 +1074,8 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
       return
     }
 
-    var heightsByIndex = [Int: CGFloat]()
-    var expandedEligibilityByIndex = [Int: Bool]()
+    var heightsByIndex = Array(repeating: CGFloat.zero, count: items.count)
+    var expandedEligibilityByIndex = Array(repeating: false, count: items.count)
 
     for index in items.indices {
       let preferredHeight = BetaTestCollectionViewCell.preferredHeight(

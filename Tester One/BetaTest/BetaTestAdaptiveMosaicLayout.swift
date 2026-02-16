@@ -24,7 +24,6 @@ final class BetaTestAdaptiveMosaicLayout: UICollectionViewLayout {
   var lineSpacing: CGFloat = 12
   var rowUnit: CGFloat = 10
   var minimumItemHeight: CGFloat = 120
-  var singleColumnBreakpoint: CGFloat = 340
   var overlapTolerance: CGFloat = 1
   var bigItemMinimumSpan = 22
   var bigItemMaximumSpan = 60
@@ -40,124 +39,37 @@ final class BetaTestAdaptiveMosaicLayout: UICollectionViewLayout {
     let boundsWidth = collectionView.bounds.width
     guard boundsWidth > 0 else { return }
 
+    let itemCount = collectionView.numberOfItems(inSection: 0)
+
     guard
       cachedAttributes.isEmpty
       || abs(boundsWidth - preparedBoundsWidth) > 0.5
+      || itemCount != preparedItemCount
     else { return }
 
     preparedBoundsWidth = boundsWidth
+    preparedItemCount = itemCount
     cachedAttributes.removeAll()
+    cachedAttributesInOrder.removeAll()
 
-    let itemCount = collectionView.numberOfItems(inSection: 0)
     guard itemCount > 0 else {
       contentSize = CGSize(width: boundsWidth, height: 0)
       return
     }
 
     let availableWidth = max(0, boundsWidth - sectionInsets.left - sectionInsets.right)
-    let shouldUseSingleColumn = availableWidth <= singleColumnBreakpoint
-    let columns = shouldUseSingleColumn ? 1 : 2
-    let totalInterItemSpacing = interItemSpacing * CGFloat(max(0, columns - 1))
-    let columnWidth = (availableWidth - totalInterItemSpacing) / CGFloat(columns)
+    let columnWidth = (availableWidth - interItemSpacing) / 2
 
     guard columnWidth > 0 else {
       contentSize = CGSize(width: boundsWidth, height: 0)
       return
     }
 
-    var columnHeights = Array(repeating: sectionInsets.top, count: columns)
+    var columnHeights = [sectionInsets.top, sectionInsets.top]
     var itemIndex = 0
 
     while itemIndex < itemCount {
       let indexPath = IndexPath(item: itemIndex, section: 0)
-
-      if columns == 1 {
-        // Force 2-column even on narrow screens - use same logic as 2-column
-        // but with adjusted column width calculation
-        let forcedColumnWidth = (availableWidth - interItemSpacing) / 2
-
-        // Use 2-column mosaic logic with forced narrow width
-        let canExpand = delegate?.adaptiveMosaicLayout(self, prefersExpandedItemAt: indexPath) ?? false
-        if !canExpand {
-          let targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1
-          let frame = CGRect(
-            x: xOrigin(for: targetColumn, columnWidth: forcedColumnWidth),
-            y: columnHeights[targetColumn],
-            width: forcedColumnWidth,
-            height: quantizedHeight(for: indexPath, width: forcedColumnWidth),
-          )
-          cacheAttributes(for: indexPath, frame: frame)
-          columnHeights[targetColumn] = frame.maxY + lineSpacing
-          itemIndex += 1
-          continue
-        }
-
-        // Big item block with expansion (same as 2-column)
-        let bigColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1
-        let smallColumn = 1 - bigColumn
-        let bigIndexPath = indexPath
-        let bigX = xOrigin(for: bigColumn, columnWidth: forcedColumnWidth)
-        let bigY = columnHeights[bigColumn]
-
-        let preferredBigHeight = quantizedHeight(for: bigIndexPath, width: forcedColumnWidth)
-        var bigHeight = max(preferredBigHeight, CGFloat(bigItemMinimumSpan) * rowUnit)
-        let maxSpanHeight = CGFloat(bigItemMaximumSpan) * rowUnit
-        // Never cap below the content's preferred height (must fit full multiline text).
-        if preferredBigHeight <= maxSpanHeight {
-          bigHeight = min(bigHeight, maxSpanHeight)
-        } else {
-          bigHeight = preferredBigHeight
-        }
-
-        cacheAttributes(for: bigIndexPath, frame: CGRect(x: bigX, y: bigY, width: forcedColumnWidth, height: bigHeight))
-        itemIndex += 1
-
-        var smallStackY = columnHeights[smallColumn]
-
-        while itemIndex < itemCount {
-          let nextIndexPath = IndexPath(item: itemIndex, section: 0)
-          let nextHeight = quantizedHeight(for: nextIndexPath, width: forcedColumnWidth)
-          let projectedBottom = smallStackY + nextHeight
-          let currentBigBottom = bigY + bigHeight
-
-          if projectedBottom <= currentBigBottom + overlapTolerance {
-            let nextFrame = CGRect(
-              x: xOrigin(for: smallColumn, columnWidth: forcedColumnWidth),
-              y: smallStackY,
-              width: forcedColumnWidth,
-              height: nextHeight,
-            )
-            cacheAttributes(for: nextIndexPath, frame: nextFrame)
-            smallStackY = nextFrame.maxY + lineSpacing
-            itemIndex += 1
-            continue
-          }
-
-          if smallStackY < currentBigBottom - overlapTolerance {
-            // Expand the big card to absorb overlap boundary (orange-zone concept).
-            bigHeight = projectedBottom - bigY
-            if let bigAttributes = cachedAttributes[bigIndexPath] {
-              bigAttributes.frame.size.height = bigHeight
-            }
-
-            let nextFrame = CGRect(
-              x: xOrigin(for: smallColumn, columnWidth: forcedColumnWidth),
-              y: smallStackY,
-              width: forcedColumnWidth,
-              height: nextHeight,
-            )
-            cacheAttributes(for: nextIndexPath, frame: nextFrame)
-            smallStackY = nextFrame.maxY + lineSpacing
-            itemIndex += 1
-          }
-
-          break
-        }
-
-        columnHeights[bigColumn] = bigY + bigHeight + lineSpacing
-        columnHeights[smallColumn] = smallStackY
-        continue
-      }
 
       let canExpand = delegate?.adaptiveMosaicLayout(self, prefersExpandedItemAt: indexPath) ?? false
       if !canExpand {
@@ -246,7 +158,7 @@ final class BetaTestAdaptiveMosaicLayout: UICollectionViewLayout {
   }
 
   override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-    cachedAttributes.values.filter { $0.frame.intersects(rect) }
+    cachedAttributesInOrder.filter { $0.frame.intersects(rect) }
   }
 
   override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
@@ -269,18 +181,23 @@ final class BetaTestAdaptiveMosaicLayout: UICollectionViewLayout {
   override func invalidateLayout() {
     super.invalidateLayout()
     cachedAttributes.removeAll()
+    cachedAttributesInOrder.removeAll()
+    preparedItemCount = 0
   }
 
   // MARK: Private
 
   private var cachedAttributes = [IndexPath: UICollectionViewLayoutAttributes]()
+  private var cachedAttributesInOrder = [UICollectionViewLayoutAttributes]()
   private var contentSize = CGSize.zero
   private var preparedBoundsWidth: CGFloat = 0
+  private var preparedItemCount = 0
 
   private func cacheAttributes(for indexPath: IndexPath, frame: CGRect) {
     let attributes = UICollectionViewLayoutAttributes(forCellWith: indexPath)
     attributes.frame = frame.integral
     cachedAttributes[indexPath] = attributes
+    cachedAttributesInOrder.append(attributes)
   }
 
   private func frameForItem(
