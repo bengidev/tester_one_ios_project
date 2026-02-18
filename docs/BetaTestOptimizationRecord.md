@@ -167,6 +167,45 @@ This document records the BetaTest optimization journey in chronological order s
 - Removes a stale-state edge case without changing visual behavior or run flow.
 - Keeps retry interaction deterministic after auto-scroll driven processing.
 
+### 4.4 De-Optimization and Portability Cleanup (2026-02-18)
+
+**Problem:**
+- The module carried optimization layers that were no longer justified for a small, portable feature surface.
+- Debug helper methods were directly consumed by host automation and tests, creating module-boundary leakage.
+
+**What changed:**
+- Removed static preferred-height cache complexity from `BetaTestCollectionViewCell` while keeping sizing-cell Auto Layout measurement.
+- Removed deferred non-visible reload queue complexity in `BetaTestViewController` and kept direct, validated reload behavior.
+- Removed focus telemetry arrays and simplified related debug/testing hooks through a dedicated debug harness seam.
+- Simplified mosaic tuning profile branching and moved to a smaller adaptive configuration pass.
+- Normalized deployment target drift in project settings to align with iOS 12 baseline expectations.
+
+**Impact:**
+- Lower maintenance burden and fewer invalidation edge cases.
+- Cleaner host/module boundaries for standalone BetaTest reuse.
+- Preserved visible flow semantics with simpler internal control paths.
+
+### 4.5 Contract Simplification + Resource Ownership Shift (2026-02-18)
+
+**Problem:**
+- Generic icon contract (`iconAssetName`) and split status asset params created ambiguity for host integrators.
+- State-specific visual intent (initial/failed/success) was not explicit at API level.
+
+**What changed:**
+- Removed generic `iconAssetName` from module-facing DTOs.
+- Added explicit state icon inputs in item configuration:
+  - `initialIconAssetName`
+  - `failedIconAssetName`
+  - `successIconAssetName`
+- Kept single generic `statusAssetName` for trailing status badge customization.
+- Updated cell icon resolution to follow explicit state precedence and fallback between provided state assets.
+- Updated failed-state UI visibility rule so retry badge and status badge cannot overlap.
+
+**Impact:**
+- Host-side API is clearer: module users control resource semantics directly per state.
+- Better production readiness for teams replacing placeholder assets with branded resources.
+- Reduced confusion during module onboarding and integration.
+
 ## 5) Verification Record
 
 - Local verification command: `./run-tests.sh`
@@ -180,10 +219,9 @@ This document records the BetaTest optimization journey in chronological order s
 2. Then we improved adaptive mosaic behavior and caching to reduce unnecessary recompute.
 3. Next, we locked interaction during processing so auto-run cannot be disturbed.
 4. Then we enforced a strict always-2-column rule and removed dead 1-column logic.
-5. Finally, we optimized two hot paths: repeated cell height measurement (cached) and non-visible reload churn (batched).
+5. Finally, we simplified over-optimized internals so the module is easier to transplant and maintain.
 
 ## 7) Remaining Low-Risk Opportunities
 
-- Add spatial indexing for `layoutAttributesForElements(in:)` to avoid scanning all cached attributes on every rect query.
-- Cap/trim focus tracking arrays for very long sessions.
-- Add lightweight signposts (`os_signpost`) around `prepare()`, `ensureMosaicMeasurements`, and cell sizing for measured profiling.
+- Add lightweight signposts (`os_signpost`) around `prepare()` and cell sizing for measured profiling.
+- Add explicit benchmark notes for long-list behavior on older devices (iOS 12-compatible simulator/device runs).

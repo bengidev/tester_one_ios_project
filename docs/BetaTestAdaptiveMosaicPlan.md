@@ -21,13 +21,11 @@ Use `BetaTestLayoutStrategy`:
 - `.adaptiveMosaic` (new)
 
 ## Responsive / Accessibility
-- 2 columns by default
-- 1-column fallback when width is too narrow (`singleColumnBreakpoint`)
-- Text measured from Dynamic Type-aware card height estimator
+- 2 columns across all supported widths
+- Text measured from Dynamic Type-aware card height estimation
 
 ## Tuning Knobs
 - `rowUnit`
 - `minimumItemHeight`
-- `singleColumnBreakpoint`
 - `bigItemMinimumSpan`, `bigItemMaximumSpan`
 - `overlapTolerance`
