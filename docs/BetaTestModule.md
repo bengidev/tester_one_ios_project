@@ -3,6 +3,37 @@
 ## Purpose
 `BetaTest` is now structured as a standalone, host-injectable feature module that can be transplanted into a production app.
 
+## Non-Technical Guide (PM/QA/Design)
+
+### What this module does
+- Shows a list of test cards (for example: CPU, camera, network checks).
+- Runs those checks in sequence and updates each card status.
+- Supports retry when an item fails.
+- Lets product teams control texts, callbacks, and images from the host app.
+
+### Why this is useful
+- Reusable: can be moved into another app with minimal rework.
+- Customizable: host app chooses labels, images, and run behavior.
+- Predictable: item flow and retry behavior are consistent.
+- Compatible: designed for iOS 12+ while still working on latest iOS.
+
+### What teams can customize without touching internals
+- Screen text (title/buttons).
+- Per-item title and retry label.
+- Per-state icons (`initial`, `failed`, `success`).
+- Status badge image.
+- What each test item actually does when executed.
+
+### Typical rollout flow
+1. Product/QA define item list and expected pass/fail behavior.
+2. Design provides icon assets for `initial`, `failed`, and `success` states.
+3. Engineering maps each item to a real execution handler.
+4. QA validates first-run + retry path and confirms visual states.
+
+### Ownership boundary (important)
+- BetaTest module: UI flow, state transitions, and rendering rules.
+- Host app: real test logic, environment-specific behavior, branding resources, and analytics wiring.
+
 ## Design constraints
 - iOS 12.0+
 - Programmatic UI inside the BetaTest module only (no Storyboard dependency in module internals)

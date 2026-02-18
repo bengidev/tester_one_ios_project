@@ -1,16 +1,44 @@
 # BetaTest Optimization Record (2026-02-12 to 2026-02-16)
 
-This document records the BetaTest optimization journey in chronological order so it is easy to explain to teammates/friends.
+This document records the BetaTest improvement journey in chronological order.
+It is written so non-technical readers can understand what changed, why it changed, and what the result is.
 
-## 1) Scope and Constraints
+## Quick Story (Non-Technical)
 
-- Module scope: `Tester One/BetaTest/`
-- Platform constraint: iOS 12+ compatibility retained
-- UX constraint: preserve existing card visuals, scaling behavior, and current interaction model
-- Layout constraint (final): always 2-column mosaic on every screen size
-- Verification baseline: `./run-tests.sh` must pass after each optimization batch
+If you only read one section, read this.
 
-## 2) High-Level Timeline (from git history)
+What we did:
+- We turned BetaTest from a developer-heavy prototype into a cleaner module that can be reused in a real product.
+- We removed confusing and unnecessary internal complexity.
+- We moved control to the app owner (the host app), so teams can decide how each test runs and how each state looks.
+- We kept compatibility with older iPhones (iOS 12+) while still supporting modern iOS.
+
+Why this matters:
+- Easier to maintain.
+- Easier to customize for branding and product needs.
+- Less risky behavior during test runs.
+- Clearer setup for teams that want to adopt this module.
+
+Final result in one sentence:
+- BetaTest is now simpler, more portable, and more production-ready, with clearer ownership between the module and the host app.
+
+## Glossary (Simple Terms)
+
+- Host app: the main app that uses this BetaTest module.
+- Module: the reusable BetaTest component itself.
+- State: the card status (`initial`, `loading`, `failed`, `success`).
+- Retry: running a failed test again.
+- iOS 12 compatibility: works on older iOS devices, not only latest iOS.
+
+## 1) Scope and Boundaries
+
+- Main module files: `Tester One/BetaTest/`
+- Platform goal: keep iOS 12+ support
+- UI goal: keep the same overall look and interaction style
+- Layout goal: always use 2 columns on all screen sizes
+- Validation goal: build/tests should keep passing after each major batch
+
+## 2) Timeline of Improvements (from git history)
 
 | Date | Commit | Theme |
 |---|---|---|
@@ -34,76 +62,76 @@ This document records the BetaTest optimization journey in chronological order s
 | 2026-02-16 | `289d7d2` | Processing lock UX: disable retry and user scroll during run |
 | 2026-02-16 | `64b7251` | Enforced 2-column mosaic only (removed 1-column code path) |
 
-## 3) Optimization Narrative by Phase
+## 3) What Changed, in Plain Language
 
-### Phase A — Execution Flow Stabilization (2026-02-12)
+### Phase A - Make Run Flow Predictable (2026-02-12)
 
-**Problem:** Processing logic and callbacks were fragmented, making runtime behavior harder to reason about.
-
-**What changed:**
-- Processing moved to explicit sequential per-cell execution.
-- Callback flow was consolidated around event-based processing.
-- Per-cell execution contract became explicit: item handlers must complete through the continuation callback.
-
-**Impact:**
-- More deterministic test progression.
-- Easier integration for host/app consumers.
-- Lower risk of inconsistent behavior between initial run and retry run.
-
-### Phase B — Adaptive Mosaic Foundations and Tuning (2026-02-13)
-
-**Problem:** Static card layout did not adapt well across width/content-size variations.
+**Problem:** The run flow was split across too many moving parts, so behavior was hard to predict.
 
 **What changed:**
-- Adaptive mosaic strategy introduced and tuned.
-- Breakpoint and spacing behavior refined for smoother responsive rhythm.
-- Module boundaries clarified for maintainability.
+- We made test execution clearly sequential (one item at a time).
+- We simplified callback/event flow.
+- We made completion rules explicit so each item finishes in one clear way.
 
 **Impact:**
-- Better visual adaptability across device widths.
-- Improved maintainability through clearer module shape.
+- More predictable behavior.
+- Easier integration for app teams.
+- Fewer inconsistencies between first run and retry.
 
-### Phase C — Stage Progression, Caching, and Test Hardening (2026-02-14 to 2026-02-15)
+### Phase B - Improve Layout Consistency (2026-02-13)
 
-**Problem:** Remaining runtime rough edges in progression/focus and potential recompute overhead in mosaic sizing.
+**Problem:** Card layout did not adapt well enough across different screen sizes and text sizes.
 
 **What changed:**
-- Progression and focus-follow flow refined in staged passes.
-- Mosaic measurement caching (`height` + `expand eligibility`) strengthened.
-- Test and simulator scripts hardened for resilient CI/local runs.
-- Stage 7 integration and E2E verification completed.
+- We improved adaptive mosaic layout behavior.
+- We tuned spacing and responsive rules.
+- We clarified module boundaries to reduce future maintenance friction.
 
 **Impact:**
-- Lower recomputation overhead in adaptive layout decisions.
-- More reliable test runs across environments.
-- Better confidence from broader integration coverage.
+- Better visual consistency across devices.
+- Easier long-term maintenance.
 
-### Phase D — Processing Interaction Locks + Deterministic Retry Outcome (2026-02-16, earlier)
+### Phase C - Strengthen Reliability (2026-02-14 to 2026-02-15)
 
-**Problem:** During active processing, user interaction could interfere with automatic flow.
+**Problem:** There were still rough edges in run progression/focus and extra layout recalculation work.
 
 **What changed:**
-- Retry button interaction is disabled during `.processing` and restored after run phase exits processing.
-- User scroll interaction is disabled during `.processing` and restored afterward.
-- Retry result path configured to fail for consistency testing scenarios.
+- We improved progression and focus behavior during long runs.
+- We reduced unnecessary recalculation in layout decisions.
+- We made test/simulator scripts more resilient.
+- We completed broader integration verification.
 
 **Impact:**
-- Automatic run appears deterministic.
-- Manual interference reduced during active execution.
-- Easier consistency checks for retry behavior.
+- Smoother runtime behavior.
+- More reliable test execution in different environments.
+- Higher confidence in stability.
 
-### Phase E — Hard Rule: Always 2-Column + Codepath Simplification (2026-02-16)
+### Phase D - Prevent User Interference During Active Runs (2026-02-16, earlier)
 
-**Problem:** 1-column branch still existed in layout code, creating extra branching/maintenance burden.
+**Problem:** Users could accidentally interfere while automated processing was running.
 
 **What changed:**
-- Removed single-column breakpoint plumbing from `BetaTestViewController` profile model.
-- Removed single-column branch from `BetaTestAdaptiveMosaicLayout.prepare()`.
-- Layout now always computes 2 columns across all widths.
+- Retry interactions are disabled during active processing, then restored.
+- Scrolling is disabled during active processing, then restored.
+- Retry path was made deterministic for consistency checks.
 
 **Impact:**
-- Behavior matches product requirement exactly (always 2-column).
-- Less branch complexity inside layout pass.
+- More stable automated flow.
+- Less accidental interruption.
+- Easier consistency validation.
+
+### Phase E - Enforce Always 2 Columns and Remove Extra Branches (2026-02-16)
+
+**Problem:** Old 1-column code paths still existed and made maintenance harder.
+
+**What changed:**
+- We removed obsolete single-column logic.
+- We simplified the layout decision path.
+- The layout now always uses 2 columns.
+
+**Impact:**
+- Matches product requirement exactly.
+- Cleaner, simpler code.
 
 ## 4) Current Optimization Batch (this request)
 
@@ -167,7 +195,7 @@ This document records the BetaTest optimization journey in chronological order s
 - Removes a stale-state edge case without changing visual behavior or run flow.
 - Keeps retry interaction deterministic after auto-scroll driven processing.
 
-### 4.4 De-Optimization and Portability Cleanup (2026-02-18)
+### 4.4 Remove Over-Engineering and Improve Portability (2026-02-18)
 
 **Problem:**
 - The module carried optimization layers that were no longer justified for a small, portable feature surface.
@@ -185,7 +213,7 @@ This document records the BetaTest optimization journey in chronological order s
 - Cleaner host/module boundaries for standalone BetaTest reuse.
 - Preserved visible flow semantics with simpler internal control paths.
 
-### 4.5 Contract Simplification + Resource Ownership Shift (2026-02-18)
+### 4.5 Clarify Ownership of Behavior and Visual Assets (2026-02-18)
 
 **Problem:**
 - Generic icon contract (`iconAssetName`) and split status asset params created ambiguity for host integrators.
@@ -213,15 +241,41 @@ This document records the BetaTest optimization journey in chronological order s
 - Note: SourceKit diagnostics in this shell may report `No such module 'UIKit'`, while Xcode build/test pipeline compiles and passes through `xcodebuild`.
 - For the post-batch retry-interaction re-sync fix, simulator validation was intentionally skipped by request; manual validation is expected by the owner.
 
-## 6) How to Explain This to Others (simple script)
+## 6) Easy Explanation Script
 
-1. We first stabilized BetaTest execution to be deterministic and callback-driven per item.
-2. Then we improved adaptive mosaic behavior and caching to reduce unnecessary recompute.
-3. Next, we locked interaction during processing so auto-run cannot be disturbed.
-4. Then we enforced a strict always-2-column rule and removed dead 1-column logic.
-5. Finally, we simplified over-optimized internals so the module is easier to transplant and maintain.
+1. First, we made the test flow predictable and easier to reason about.
+2. Then, we improved layout behavior so cards stay consistent across devices.
+3. Next, we reduced user interference during active processing.
+4. Then, we simplified layout rules to a clear always-2-column model.
+5. Finally, we removed over-engineering and gave app teams clearer control over behavior and assets.
 
 ## 7) Remaining Low-Risk Opportunities
 
 - Add lightweight signposts (`os_signpost`) around `prepare()` and cell sizing for measured profiling.
 - Add explicit benchmark notes for long-list behavior on older devices (iOS 12-compatible simulator/device runs).
+
+## 8) Finalization Log (2026-02-18)
+
+### Completed and pushed
+
+- `c2d17d4` — `refactor(betatest): hand over execution and icon resources to host`
+  - Removed module debug/provider baggage and completed host-owned execution/resource contract.
+  - Confirmed state-driven icon ownership (`initial/failed/success`) and generic status badge ownership (`statusAssetName`).
+  - Included corresponding module, host wiring, tests, and asset updates.
+- `f1569f4` — `docs(betatest): align guides with host-owned module contract`
+  - Updated usage docs and optimization narrative to match current production module API.
+  - Synced stale entrypoint references in the active refactor plan.
+- `d9f7eef` — `chore(devtools): add build server config and sourcekit-lsp settings`
+  - Added `buildServer.json` and updated `.vscode/settings.json` for consistent local SourceKit-LSP/build-server behavior.
+
+### Verification state at finalization (plain language)
+
+- The app build succeeded for simulator.
+- Code diagnostics were clean on the modified module/host/test files.
+- Full simulator tests were skipped in the final pass because the owner requested it (low RAM machine).
+
+### Portability outcome snapshot (what this means for product teams)
+
+- Product teams can now control behavior and visuals from the host app more clearly.
+- Debug-only internals are no longer part of the production contract.
+- Documentation now matches real implementation and is easier for onboarding.
