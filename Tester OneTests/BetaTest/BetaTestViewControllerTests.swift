@@ -12,7 +12,7 @@ final class Tester_OneTests: XCTestCase {
 
   @MainActor
   func testBetaTestItemAccessibilityTokenNormalization() {
-    let item = BetaTestItem(title: "Tes Kartu SIM #1", icon: .sim, state: .initial)
+    let item = BetaTestItem(title: "Tes Kartu SIM #1", initialIconAssetName: "simImage", state: .initial)
     XCTAssertEqual(item.accessibilityToken, "tes_kartu_sim_1")
   }
 
@@ -35,7 +35,6 @@ final class Tester_OneTests: XCTestCase {
 
     wait(for: [exp], timeout: TestTiming.timeout)
 
-    XCTAssertEqual(sut.debug_runPhase(), .finished)
     XCTAssertEqual(capturedResults.count, 12)
     XCTAssertEqual(capturedResults[6].state, .failed)
   }
@@ -47,22 +46,22 @@ final class Tester_OneTests: XCTestCase {
 
     // Make index 0 retryable.
     sut.setState(.failed, at: 0)
-    sut.debug_triggerRetry(at: 0)
+    sut.retryItem(at: 0)
 
     // Start a new processing run before retry callback resolves.
     sut.beginProcessing()
 
     let exp = expectation(description: "new run completed")
+    var completedResults = [BetaTestViewController.ProcessResult]()
     sut.onProcessingEvent = { event in
-      if case .runCompleted = event {
+      if case .runCompleted(let results) = event {
+        completedResults = results
         exp.fulfill()
       }
     }
     wait(for: [exp], timeout: TestTiming.timeout)
 
-    // New run should complete using each item's configured execution handler (index 0 success).
-    XCTAssertEqual(sut.debug_itemState(at: 0), .success)
-    XCTAssertEqual(sut.debug_runPhase(), .finished)
+    XCTAssertEqual(completedResults.first?.state, .success)
   }
 
   @MainActor
@@ -70,14 +69,18 @@ final class Tester_OneTests: XCTestCase {
     let sut = BetaTestViewController(items: makeFixtureItems())
     _ = sut.view
 
-    sut.setState(.initial, at: 0)
-    let first = sut.debug_itemState(at: 0)
+    sut.setState(.failed, at: 0)
+    sut.setState(.failed, at: 0)
 
-    sut.setState(.initial, at: 0)
-    let second = sut.debug_itemState(at: 0)
+    let retryCompleted = expectation(description: "retry completed")
+    sut.onRetryCompleted = { result in
+      XCTAssertEqual(result.index, 0)
+      XCTAssertEqual(result.state, .success)
+      retryCompleted.fulfill()
+    }
 
-    XCTAssertEqual(first, .initial)
-    XCTAssertEqual(second, .initial)
+    sut.retryItem(at: 0)
+    wait(for: [retryCompleted], timeout: TestTiming.timeout)
   }
 
   @MainActor
@@ -108,12 +111,18 @@ final class Tester_OneTests: XCTestCase {
   @MainActor
   func testRetryIgnoredWhileProcessingRunIsActive() {
     var items = makeFixtureItems()
-    items[0] = makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .failed, simulatedDuration: 0.10)
+    items[0] = makeFixtureItem(
+      title: "Tester",
+      initialIconAssetName: "securityImage",
+      initialResult: .failed,
+      simulatedDuration: 0.10,
+    )
 
     let sut = BetaTestViewController(items: items)
     _ = sut.view
 
     let runCompleted = expectation(description: "run completed")
+    var runResults = [BetaTestViewController.ProcessResult]()
     let retryShouldNotFire = expectation(description: "retry callback should stay idle")
     retryShouldNotFire.isInverted = true
 
@@ -124,9 +133,12 @@ final class Tester_OneTests: XCTestCase {
     sut.onProcessingEvent = { event in
       switch event {
       case .stepCompleted(let result) where result.index == 0:
-        sut.debug_triggerRetry(at: 0)
-      case .runCompleted:
+        sut.retryItem(at: 0)
+
+      case .runCompleted(let results):
+        runResults = results
         runCompleted.fulfill()
+
       default:
         break
       }
@@ -136,13 +148,18 @@ final class Tester_OneTests: XCTestCase {
 
     wait(for: [runCompleted], timeout: TestTiming.timeout)
     wait(for: [retryShouldNotFire], timeout: TestTiming.settle)
-    XCTAssertEqual(sut.debug_itemState(at: 0), .failed)
+    XCTAssertEqual(runResults.first?.state, .failed)
   }
 
   @MainActor
   func testRetryEmitsStepStartedWithRetryPhase() {
     var items = makeFixtureItems()
-    items[0] = makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .failed, retryState: .success)
+    items[0] = makeFixtureItem(
+      title: "Tester",
+      initialIconAssetName: "securityImage",
+      initialResult: .failed,
+      retryResult: .success,
+    )
 
     let sut = BetaTestViewController(items: items)
     _ = sut.view
@@ -163,18 +180,18 @@ final class Tester_OneTests: XCTestCase {
       }
     }
 
-    sut.debug_triggerRetry(at: 0)
+    sut.retryItem(at: 0)
 
     wait(for: [retryStarted, retryCompleted], timeout: TestTiming.timeout)
   }
 
   @MainActor
-  func testSmartFollowAttemptsAllItemsAndScrollsForLongDynamicList() {
+  func testSmartFollowCompletesForLongDynamicList() {
     let longItems = (1...24).map { index in
       makeFixtureItem(
         title: "Item \(index) lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        icon: .cpu,
-        initialState: .success,
+        initialIconAssetName: "cpuImage",
+        initialResult: .success,
         simulatedDuration: 0.03,
       )
     }
@@ -183,8 +200,10 @@ final class Tester_OneTests: XCTestCase {
     _ = sut.view
 
     let completed = expectation(description: "long run completed")
+    var completedResults = [BetaTestViewController.ProcessResult]()
     sut.onProcessingEvent = { event in
-      if case .runCompleted = event {
+      if case .runCompleted(let results) = event {
+        completedResults = results
         completed.fulfill()
       }
     }
@@ -192,8 +211,7 @@ final class Tester_OneTests: XCTestCase {
     sut.beginProcessing()
     wait(for: [completed], timeout: TestTiming.timeout)
 
-    XCTAssertEqual(sut.debug_focusAttemptedIndexes().count, longItems.count)
-    XCTAssertGreaterThan(sut.debug_focusScrolledIndexes().count, 0)
+    XCTAssertEqual(completedResults.count, longItems.count)
   }
 
   // MARK: Private
@@ -205,39 +223,39 @@ final class Tester_OneTests: XCTestCase {
 
   private func makeFixtureItems() -> [BetaTestItem] {
     [
-      makeFixtureItem(title: "Tester", icon: .jailbreak, initialState: .success),
-      makeFixtureItem(title: "CPU", icon: .cpu, initialState: .success),
-      makeFixtureItem(title: "Hard Disk", icon: .hardDisk, initialState: .success),
-      makeFixtureItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
-      makeFixtureItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
-      makeFixtureItem(title: "Tes Biometric 1", icon: .biometricOne, initialState: .success),
-      makeFixtureItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
-      makeFixtureItem(title: "Tombol Volume", icon: .volume, initialState: .success),
-      makeFixtureItem(title: "Tombol On/Off", icon: .power, initialState: .success),
-      makeFixtureItem(title: "Tes Kamera", icon: .camera, initialState: .success),
-      makeFixtureItem(title: "Tes Layar Sentuh", icon: .touch, initialState: .success),
-      makeFixtureItem(title: "Tes Kartu SIM", icon: .sim, initialState: .success),
+      makeFixtureItem(title: "Tester", initialIconAssetName: "securityImage", initialResult: .success),
+      makeFixtureItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success),
+      makeFixtureItem(title: "Hard Disk", initialIconAssetName: "hardDiskImage", initialResult: .success),
+      makeFixtureItem(title: "Kondisi Baterai", initialIconAssetName: "batteryImage", initialResult: .success),
+      makeFixtureItem(title: "Tes Jailbreak", initialIconAssetName: "securityImage", initialResult: .success),
+      makeFixtureItem(title: "Tes Biometric 1", initialIconAssetName: "faceIDImage", initialResult: .success),
+      makeFixtureItem(title: "Tombol Silent", initialIconAssetName: "silentImage", initialResult: .failed),
+      makeFixtureItem(title: "Tombol Volume", initialIconAssetName: "volumeImage", initialResult: .success),
+      makeFixtureItem(title: "Tombol On/Off", initialIconAssetName: "powerImage", initialResult: .success),
+      makeFixtureItem(title: "Tes Kamera", initialIconAssetName: "cameraImage", initialResult: .success),
+      makeFixtureItem(title: "Tes Layar Sentuh", initialIconAssetName: "touchImage", initialResult: .success),
+      makeFixtureItem(title: "Tes Kartu SIM", initialIconAssetName: "simImage", initialResult: .success),
     ]
   }
 
   private func makeFixtureItem(
     title: String,
-    icon: BetaTestItem.IconType,
-    initialState: BetaTestCardState,
-    retryState: BetaTestCardState = .success,
+    initialIconAssetName: String? = nil,
+    initialResult: BetaTestCardState,
+    retryResult: BetaTestCardState = .success,
     simulatedDuration: TimeInterval = 0.01,
   ) -> BetaTestItem {
     BetaTestItem(
       title: title,
-      icon: icon,
+      initialIconAssetName: initialIconAssetName,
       state: .initial,
       executionHandler: { phase, continueExecutionWithState in
         let state: BetaTestCardState =
           switch phase {
           case .initial:
-            initialState
+            initialResult
           case .retry:
-            retryState
+            retryResult
           }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {

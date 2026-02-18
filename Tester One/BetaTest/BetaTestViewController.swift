@@ -79,9 +79,6 @@ final class BetaTestViewController: UIViewController {
   func beginProcessing() {
     guard runPhase != .processing else { return }
 
-    focusAttemptedIndexes.removeAll(keepingCapacity: true)
-    focusScrolledIndexes.removeAll(keepingCapacity: true)
-
     let runID = runCoordinator.beginProcessingRun()
     setRunPhase(.processing)
     processNextItem(at: 0, runID: runID, results: [])
@@ -98,11 +95,13 @@ final class BetaTestViewController: UIViewController {
   }
 
   /// Customize one cell content without touching others.
-  func updateItemContent(at index: Int, mutate: (inout BetaTestItem.Content) -> Void) {
+  func updateItemContent(
+    at index: Int,
+    transform: (BetaTestItem.Content) -> BetaTestItem.Content,
+  ) {
     guard items.indices.contains(index) else { return }
-    mutate(&items[index].content)
-    cachedRowMeasurements = nil
-    cachedMosaicMeasurements = nil
+    items[index].content = transform(items[index].content)
+    invalidateMeasurementCache()
     reloadItem(at: index)
   }
 
@@ -112,6 +111,10 @@ final class BetaTestViewController: UIViewController {
   func updateItemExecutionHandler(at index: Int, handler: @escaping BetaTestItem.ExecutionHandler) {
     guard items.indices.contains(index) else { return }
     items[index].executionHandler = handler
+  }
+
+  func retryItem(at index: Int) {
+    handleRetryTap(at: index)
   }
 
   override func viewDidLoad() {
@@ -130,7 +133,7 @@ final class BetaTestViewController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    applyMosaicTuningProfileIfNeeded()
+    applyAdaptiveLayoutMetricsIfNeeded()
     applyBottomControlMetricsIfNeeded()
     updateCollectionLayoutIfNeeded()
     updateContinueButtonShadowPathIfNeeded()
@@ -144,38 +147,11 @@ final class BetaTestViewController: UIViewController {
       != traitCollection.preferredContentSizeCategory
     else { return }
 
-    cachedRowMeasurements = nil
-    cachedMosaicMeasurements = nil
-    applyMosaicTuningProfileIfNeeded(force: true)
+    invalidateMeasurementCache()
+    applyAdaptiveLayoutMetricsIfNeeded(force: true)
     applyBottomControlMetricsIfNeeded(force: true)
     collectionView.collectionViewLayout.invalidateLayout()
   }
-
-  #if DEBUG
-  func debug_runPhase() -> RunPhase { runPhase }
-  func debug_itemState(at index: Int) -> BetaTestCardState? {
-    guard items.indices.contains(index) else { return nil }
-    return items[index].state
-  }
-
-  func debug_triggerRetry(at index: Int) { handleRetryTap(at: index) }
-  func debug_focusAttemptedIndexes() -> [Int] { focusAttemptedIndexes }
-  func debug_focusScrolledIndexes() -> [Int] { focusScrolledIndexes }
-  func debug_scrollToBottom(animated: Bool) {
-    let maxOffsetY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
-    collectionView.setContentOffset(CGPoint(x: 0, y: maxOffsetY), animated: animated)
-  }
-
-  func debug_scrollToTop(animated: Bool) {
-    collectionView.setContentOffset(CGPoint(x: 0, y: -collectionView.adjustedContentInset.top), animated: animated)
-  }
-
-  func debug_scrollToMiddle(animated: Bool) {
-    let maxOffsetY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
-    let middleOffsetY = maxOffsetY * 0.5
-    collectionView.setContentOffset(CGPoint(x: 0, y: middleOffsetY), animated: animated)
-  }
-  #endif
 
   // MARK: Private
 
@@ -220,13 +196,12 @@ final class BetaTestViewController: UIViewController {
 
   }
 
-  private struct MosaicTuningProfile: Equatable {
-    let rowUnit: CGFloat
-    let minimumItemHeight: CGFloat
-    let overlapTolerance: CGFloat
-    let bigItemMinimumSpan: Int
-    let bigItemMaximumSpan: Int
-    let bigItemMinimumHeight: CGFloat
+  private struct MeasurementCache {
+    let widthKey: Int
+    let contentSizeCategory: UIContentSizeCategory
+    let heightsByIndex: [CGFloat]
+    let heightsByRow: [CGFloat]
+    let expandedEligibilityByIndex: [Bool]
   }
 
   private struct BottomControlMetrics: Equatable {
@@ -259,7 +234,7 @@ final class BetaTestViewController: UIViewController {
   private let layoutStrategy: BetaTestLayoutStrategy
   private let screen: BetaTestModuleConfiguration.Screen
   private var mosaicBigItemMinimumHeight: CGFloat = 220
-  private var lastAppliedMosaicProfile: MosaicTuningProfile?
+  private var lastAdaptiveLayoutSignature: (isNarrow: Bool, isAccessibilityCategory: Bool)?
   private var runPhase = RunPhase.idle
   private var isRetryInteractionEnabled = true
   private var runCoordinator = RunCoordinator()
@@ -267,29 +242,13 @@ final class BetaTestViewController: UIViewController {
   private var lastCollectionWidth: CGFloat = 0
   private var lastContinueButtonShadowBounds = CGRect.zero
   private var lastBottomControlMetrics: BottomControlMetrics?
-  private var focusAttemptedIndexes = [Int]()
-  private var focusScrolledIndexes = [Int]()
-  private var pendingReloadIndexPaths = Set<IndexPath>()
-  private var isReloadBatchScheduled = false
+  private var measurementCache: MeasurementCache?
 
   private var continueButtonShadowLeadingConstraint: NSLayoutConstraint?
   private var continueButtonShadowTrailingConstraint: NSLayoutConstraint?
   private var continueButtonShadowTopConstraint: NSLayoutConstraint?
   private var continueButtonShadowBottomConstraint: NSLayoutConstraint?
   private var continueButtonShadowMinHeightConstraint: NSLayoutConstraint?
-  private var cachedRowMeasurements:
-    (
-      width: CGFloat,
-      contentSizeCategory: UIContentSizeCategory,
-      heightsByRow: [CGFloat],
-    )?
-  private var cachedMosaicMeasurements:
-    (
-      width: CGFloat,
-      contentSizeCategory: UIContentSizeCategory,
-      heightsByIndex: [CGFloat],
-      expandedEligibilityByIndex: [Bool],
-    )?
 
   private lazy var uniformGridLayout: UICollectionViewFlowLayout = {
     let layout = UICollectionViewFlowLayout()
@@ -492,17 +451,21 @@ final class BetaTestViewController: UIViewController {
       bottomOverlayView.trailingAnchor.constraint(equalTo: contentContainerView.trailingAnchor),
       bottomOverlayView.bottomAnchor.constraint(equalTo: contentContainerView.bottomAnchor),
 
-      continueButtonShadowLeadingConstraint,
-      continueButtonShadowTrailingConstraint,
-      continueButtonShadowTopConstraint,
-      continueButtonShadowMinHeightConstraint,
-      continueButtonShadowBottomConstraint,
+      continueButtonShadowLeadingConstraint!,
+      continueButtonShadowTrailingConstraint!,
+      continueButtonShadowTopConstraint!,
+      continueButtonShadowMinHeightConstraint!,
+      continueButtonShadowBottomConstraint!,
 
       continueButton.leadingAnchor.constraint(equalTo: continueButtonShadowView.leadingAnchor),
       continueButton.trailingAnchor.constraint(equalTo: continueButtonShadowView.trailingAnchor),
       continueButton.topAnchor.constraint(equalTo: continueButtonShadowView.topAnchor),
       continueButton.bottomAnchor.constraint(equalTo: continueButtonShadowView.bottomAnchor),
-    ].compactMap { $0 })
+    ])
+  }
+
+  private func invalidateMeasurementCache() {
+    measurementCache = nil
   }
 
   private func bottomControlMetrics(
@@ -559,93 +522,43 @@ final class BetaTestViewController: UIViewController {
     continueButtonShadowView.layer.shadowRadius = metrics.shadowRadius
   }
 
-  private func applyMosaicTuningProfileIfNeeded(force: Bool = false) {
+  private func applyAdaptiveLayoutMetricsIfNeeded(force: Bool = false) {
     guard layoutStrategy == .adaptiveMosaic else { return }
 
     let width = collectionView.bounds.width
     guard width > 0 else { return }
 
-    let profile = mosaicProfile(for: width, contentSizeCategory: traitCollection.preferredContentSizeCategory)
-    guard force || profile != lastAppliedMosaicProfile else { return }
-
-    adaptiveMosaicLayout.rowUnit = profile.rowUnit
-    adaptiveMosaicLayout.minimumItemHeight = profile.minimumItemHeight
-    adaptiveMosaicLayout.overlapTolerance = profile.overlapTolerance
-    adaptiveMosaicLayout.bigItemMinimumSpan = profile.bigItemMinimumSpan
-    adaptiveMosaicLayout.bigItemMaximumSpan = profile.bigItemMaximumSpan
-    mosaicBigItemMinimumHeight = profile.bigItemMinimumHeight
-
-    // Adjust insets for narrow screens to fit 2-column
-    if width <= 360 {
-      adaptiveMosaicLayout.sectionInsets = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
-      adaptiveMosaicLayout.interItemSpacing = 6
-      adaptiveMosaicLayout.lineSpacing = 6
-    } else if width <= 400 {
-      adaptiveMosaicLayout.sectionInsets = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-      adaptiveMosaicLayout.interItemSpacing = 10
-      adaptiveMosaicLayout.lineSpacing = 10
-    } else {
-      adaptiveMosaicLayout.sectionInsets = UIEdgeInsets(
-        top: Layout.gridTopInset,
-        left: Layout.gridHorizontalInset,
-        bottom: Layout.gridBottomInset,
-        right: Layout.gridHorizontalInset,
-      )
-      adaptiveMosaicLayout.interItemSpacing = Layout.gridInterItemSpacing
-      adaptiveMosaicLayout.lineSpacing = Layout.gridLineSpacing
+    let isNarrow = width <= 360
+    let isAccessibilityCategory = traitCollection.preferredContentSizeCategory
+      .isAccessibilityCategory
+    if
+      !force,
+      let lastAdaptiveLayoutSignature,
+      lastAdaptiveLayoutSignature.isNarrow == isNarrow,
+      lastAdaptiveLayoutSignature.isAccessibilityCategory == isAccessibilityCategory
+    {
+      return
     }
 
-    lastAppliedMosaicProfile = profile
-  }
-
-  private func mosaicProfile(
-    for width: CGFloat,
-    contentSizeCategory: UIContentSizeCategory,
-  ) -> MosaicTuningProfile {
-    if contentSizeCategory.isAccessibilityCategory {
-      // AX sizes: 2-column concept with adjusted sizing for larger text
-      return MosaicTuningProfile(
-        rowUnit: 10,
-        minimumItemHeight: 160,
-        overlapTolerance: 1.0,
-        bigItemMinimumSpan: 20,
-        bigItemMaximumSpan: 44,
-        bigItemMinimumHeight: 260,
-      )
-    }
-
-    if width <= 360 {
-      // Narrow devices: 2-column with minimal spacing
-      return MosaicTuningProfile(
-        rowUnit: 6, // Smaller grid unit
-        minimumItemHeight: 90, // Smaller cards for narrow screens
-        overlapTolerance: 0.5,
-        bigItemMinimumSpan: 14, // Smaller big cards (140pt min)
-        bigItemMaximumSpan: 28, // Cap expansion
-        bigItemMinimumHeight: 160, // Lower threshold
-      )
-    }
-
-    if width <= 400 {
-      return MosaicTuningProfile(
-        rowUnit: 8,
-        minimumItemHeight: 120,
-        overlapTolerance: 0.5,
-        bigItemMinimumSpan: 20,
-        bigItemMaximumSpan: 42,
-        bigItemMinimumHeight: 220,
-      )
-    }
-
-    // MARK: Large devices → Structured mosaic with expansion
-    return MosaicTuningProfile(
-      rowUnit: 10,
-      minimumItemHeight: 120,
-      overlapTolerance: 1.0,
-      bigItemMinimumSpan: 20,
-      bigItemMaximumSpan: 50,
-      bigItemMinimumHeight: 240,
-    )
+    adaptiveMosaicLayout.sectionInsets =
+      isNarrow
+        ? UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        : UIEdgeInsets(
+          top: Layout.gridTopInset,
+          left: Layout.gridHorizontalInset,
+          bottom: Layout.gridBottomInset,
+          right: Layout.gridHorizontalInset,
+        )
+    adaptiveMosaicLayout.interItemSpacing = isNarrow ? 8 : Layout.gridInterItemSpacing
+    adaptiveMosaicLayout.lineSpacing = isNarrow ? 8 : Layout.gridLineSpacing
+    adaptiveMosaicLayout.rowUnit = isNarrow ? 7 : 8
+    adaptiveMosaicLayout.minimumItemHeight = isAccessibilityCategory ? 150 : (isNarrow ? 100 : 120)
+    adaptiveMosaicLayout.overlapTolerance = 0.5
+    adaptiveMosaicLayout.bigItemMinimumSpan = isNarrow ? 16 : 20
+    adaptiveMosaicLayout.bigItemMaximumSpan = isNarrow ? 30 : 42
+    mosaicBigItemMinimumHeight = isAccessibilityCategory ? 260 : (isNarrow ? 180 : 220)
+    lastAdaptiveLayoutSignature = (isNarrow, isAccessibilityCategory)
+    invalidateMeasurementCache()
   }
 
   private func updateCollectionLayoutIfNeeded() {
@@ -653,8 +566,7 @@ final class BetaTestViewController: UIViewController {
     guard collectionWidth > 0 else { return }
     guard abs(collectionWidth - lastCollectionWidth) > 0.5 else { return }
     lastCollectionWidth = collectionWidth
-    cachedRowMeasurements = nil
-    cachedMosaicMeasurements = nil
+    invalidateMeasurementCache()
 
     collectionView.collectionViewLayout.invalidateLayout()
   }
@@ -734,45 +646,16 @@ final class BetaTestViewController: UIViewController {
       return
     }
 
-    enqueueReload(at: indexPath)
+    reloadItemsInBatch([indexPath])
     completion?()
   }
 
-  private func enqueueReload(at indexPath: IndexPath) {
-    guard indexPath.section == 0 else { return }
-    guard indexPath.item >= 0, indexPath.item < items.count else { return }
-
-    pendingReloadIndexPaths.insert(indexPath)
-    guard !isReloadBatchScheduled else { return }
-
-    isReloadBatchScheduled = true
-    DispatchQueue.main.async { [weak self] in
-      self?.flushPendingReloads()
-    }
-  }
-
-  private func flushPendingReloads() {
-    guard isReloadBatchScheduled else { return }
-
-    isReloadBatchScheduled = false
-    let indexPaths = pendingReloadIndexPaths
-      .filter { $0.section == 0 && $0.item >= 0 && $0.item < items.count }
-      .sorted { lhs, rhs in
-        if lhs.section == rhs.section {
-          return lhs.item < rhs.item
-        }
-        return lhs.section < rhs.section
-      }
-
-    pendingReloadIndexPaths.removeAll(keepingCapacity: true)
-    reloadItemsInBatch(indexPaths)
-  }
-
   private func reloadItemsInBatch(_ indexPaths: [IndexPath]) {
-    guard !indexPaths.isEmpty else { return }
+    let validIndexPaths = indexPaths.filter { $0.section == 0 && items.indices.contains($0.item) }
+    guard !validIndexPaths.isEmpty else { return }
 
     collectionView.performBatchUpdates {
-      collectionView.reloadItems(at: indexPaths)
+      collectionView.reloadItems(at: validIndexPaths)
     }
   }
 
@@ -913,8 +796,6 @@ final class BetaTestViewController: UIViewController {
   private func focusOnItemIfNeeded(at index: Int) {
     guard items.indices.contains(index) else { return }
 
-    focusAttemptedIndexes.append(index)
-
     let indexPath = IndexPath(item: index, section: 0)
     guard collectionView.numberOfSections > 0 else { return }
     guard collectionView.numberOfItems(inSection: 0) > index else { return }
@@ -922,17 +803,17 @@ final class BetaTestViewController: UIViewController {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
 
-      if
-        let attributes = collectionView.layoutAttributesForItem(at: indexPath)
-      {
-        let visibleRect = CGRect(origin: collectionView.contentOffset, size: collectionView.bounds.size)
+      if let attributes = collectionView.layoutAttributesForItem(at: indexPath) {
+        let visibleRect = CGRect(
+          origin: collectionView.contentOffset,
+          size: collectionView.bounds.size,
+        )
         let comfortRect = visibleRect.insetBy(dx: 0, dy: 40)
         if comfortRect.contains(attributes.frame) {
           return
         }
       }
 
-      focusScrolledIndexes.append(index)
       let animated = !UIAccessibility.isReduceMotionEnabled
       collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: animated)
     }
@@ -945,10 +826,11 @@ final class BetaTestViewController: UIViewController {
   ) {
     guard items.indices.contains(index) else { return }
 
-    let handler = items[index].executionHandler ?? { _, done in
-      assertionFailure("Missing executionHandler for item at index \(index)")
-      done(.failed)
-    }
+    let handler =
+      items[index].executionHandler ?? { _, done in
+        assertionFailure("Missing executionHandler for item at index \(index)")
+        done(.failed)
+      }
 
     handler(phase) { resultingState in
       DispatchQueue.main.async {
@@ -1023,35 +905,57 @@ extension BetaTestViewController: UICollectionViewDelegateFlowLayout {
 }
 
 extension BetaTestViewController {
-  private func adaptiveCardHeight(for itemWidth: CGFloat, at itemIndex: Int) -> CGFloat {
+  private func measurementData(for itemWidth: CGFloat) -> MeasurementCache {
+    let roundedWidth = round(itemWidth * 100) / 100
+    let widthKey = Int((roundedWidth * 100).rounded())
     let contentSizeCategory = traitCollection.preferredContentSizeCategory
-    let rowIndex = max(0, itemIndex / Layout.cardsPerRow)
+
     if
-      let cachedRowMeasurements,
-      abs(cachedRowMeasurements.width - itemWidth) < 0.5,
-      cachedRowMeasurements.contentSizeCategory == contentSizeCategory,
-      rowIndex < cachedRowMeasurements.heightsByRow.count
+      let measurementCache,
+      measurementCache.widthKey == widthKey,
+      measurementCache.contentSizeCategory == contentSizeCategory,
+      measurementCache.heightsByIndex.count == items.count
     {
-      return cachedRowMeasurements.heightsByRow[rowIndex]
+      return measurementCache
     }
 
-    let measuredHeights = BetaTestCollectionViewCell.preferredHeightsByRow(
-      for: itemWidth,
-      titles: items.map(\.title),
-      itemsPerRow: Layout.cardsPerRow,
-      traitCollection: traitCollection,
-    )
-    cachedRowMeasurements = (
-      width: itemWidth,
+    let heightsByIndex = items.map {
+      BetaTestCollectionViewCell.preferredHeight(
+        for: roundedWidth,
+        title: $0.title,
+        traitCollection: traitCollection,
+      )
+    }
+
+    var heightsByRow = [CGFloat]()
+    var startIndex = 0
+    while startIndex < heightsByIndex.count {
+      let endIndex = min(startIndex + Layout.cardsPerRow, heightsByIndex.count)
+      let rowHeight = heightsByIndex[startIndex..<endIndex].max() ?? 0
+      heightsByRow.append(rowHeight)
+      startIndex = endIndex
+    }
+
+    let expandedEligibilityByIndex = heightsByIndex.map { $0 >= mosaicBigItemMinimumHeight }
+    let resolved = MeasurementCache(
+      widthKey: widthKey,
       contentSizeCategory: contentSizeCategory,
-      heightsByRow: measuredHeights,
+      heightsByIndex: heightsByIndex,
+      heightsByRow: heightsByRow,
+      expandedEligibilityByIndex: expandedEligibilityByIndex,
     )
+    measurementCache = resolved
+    return resolved
+  }
 
-    if rowIndex < measuredHeights.count {
-      return measuredHeights[rowIndex]
+  private func adaptiveCardHeight(for itemWidth: CGFloat, at itemIndex: Int) -> CGFloat {
+    let measurements = measurementData(for: itemWidth)
+    let rowIndex = max(0, itemIndex / Layout.cardsPerRow)
+    if rowIndex < measurements.heightsByRow.count {
+      return measurements.heightsByRow[rowIndex]
     }
 
-    return measuredHeights.last ?? 0
+    return measurements.heightsByRow.last ?? 0
   }
 }
 
@@ -1059,28 +963,15 @@ extension BetaTestViewController {
 
 extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
 
-  // MARK: Internal
-
   func adaptiveMosaicLayout(
     _: BetaTestAdaptiveMosaicLayout,
     preferredHeightForItemAt indexPath: IndexPath,
     fitting width: CGFloat,
   ) -> CGFloat {
     guard items.indices.contains(indexPath.item) else { return 110 }
-
-    ensureMosaicMeasurements(for: width)
-    if
-      let cachedMosaicMeasurements,
-      indexPath.item < cachedMosaicMeasurements.heightsByIndex.count
-    {
-      return cachedMosaicMeasurements.heightsByIndex[indexPath.item]
-    }
-
-    return BetaTestCollectionViewCell.preferredHeight(
-      for: width,
-      title: items[indexPath.item].title,
-      traitCollection: traitCollection,
-    )
+    let measurements = measurementData(for: width)
+    guard indexPath.item < measurements.heightsByIndex.count else { return 110 }
+    return measurements.heightsByIndex[indexPath.item]
   }
 
   func adaptiveMosaicLayout(
@@ -1096,57 +987,9 @@ extension BetaTestViewController: BetaTestAdaptiveMosaicLayout.Delegate {
     )
     let itemWidth = max(0, availableWidth / 2)
     guard itemWidth > 0 else { return false }
-
-    ensureMosaicMeasurements(for: itemWidth)
-    if
-      let cachedMosaicMeasurements,
-      indexPath.item < cachedMosaicMeasurements.expandedEligibilityByIndex.count
-    {
-      return cachedMosaicMeasurements.expandedEligibilityByIndex[indexPath.item]
-    }
-
-    let preferredHeight = BetaTestCollectionViewCell.preferredHeight(
-      for: itemWidth,
-      title: items[indexPath.item].title,
-      traitCollection: traitCollection,
-    )
-    return preferredHeight >= mosaicBigItemMinimumHeight
-  }
-
-  // MARK: Private
-
-  private func ensureMosaicMeasurements(for width: CGFloat) {
-    let roundedWidth = round(width * 100) / 100
-    let contentSizeCategory = traitCollection.preferredContentSizeCategory
-
-    if
-      let cachedMosaicMeasurements,
-      abs(cachedMosaicMeasurements.width - roundedWidth) < 0.5,
-      cachedMosaicMeasurements.contentSizeCategory == contentSizeCategory,
-      cachedMosaicMeasurements.heightsByIndex.count == items.count
-    {
-      return
-    }
-
-    var heightsByIndex = Array(repeating: CGFloat.zero, count: items.count)
-    var expandedEligibilityByIndex = Array(repeating: false, count: items.count)
-
-    for index in items.indices {
-      let preferredHeight = BetaTestCollectionViewCell.preferredHeight(
-        for: roundedWidth,
-        title: items[index].title,
-        traitCollection: traitCollection,
-      )
-      heightsByIndex[index] = preferredHeight
-      expandedEligibilityByIndex[index] = preferredHeight >= mosaicBigItemMinimumHeight
-    }
-
-    cachedMosaicMeasurements = (
-      width: roundedWidth,
-      contentSizeCategory: contentSizeCategory,
-      heightsByIndex: heightsByIndex,
-      expandedEligibilityByIndex: expandedEligibilityByIndex,
-    )
+    let measurements = measurementData(for: itemWidth)
+    guard indexPath.item < measurements.expandedEligibilityByIndex.count else { return false }
+    return measurements.expandedEligibilityByIndex[indexPath.item]
   }
 }
 

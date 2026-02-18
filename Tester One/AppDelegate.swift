@@ -105,7 +105,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
         isRetryFlowRunning = true
         let nextIndex = retryQueue.removeFirst()
-        vc.debug_triggerRetry(at: nextIndex)
+        triggerRetryIfAvailable(on: vc, index: nextIndex)
       }
 
       viewController.onRetryCompleted = { [weak viewController] _ in
@@ -118,7 +118,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
       viewController.onProcessingEvent = { [weak self, weak viewController] event in
         guard case .runCompleted(let results) = event else { return }
-        guard let vc = viewController else { return }
+        guard viewController != nil else { return }
 
         let failedIndexes = results
           .filter { $0.state == .failed }
@@ -130,19 +130,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         retryQueue = failedIndexes
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-          vc.debug_scrollToBottom(animated: true)
-
-          DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            vc.debug_scrollToMiddle(animated: true)
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-              vc.debug_scrollToTop(animated: true)
-
-              DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                runNextRetryIfNeeded(viewController)
-              }
-            }
-          }
+          runNextRetryIfNeeded(viewController)
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -206,37 +194,130 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     [
       makeHostItem(
         title: "Convex is the open source, reactive database where queries are TypeScript code running right in the database. Just like React components react to state changes, Convex queries react to database changes.",
-        icon: .cpu,
-        initialState: .failed,
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .failed,
       ),
-      makeHostItem(title: "When you're ready to move toward production for your app, you can setup your Xcode build system to point different build targets to different Convex deployments.", icon: .hardDisk, initialState: .failed),
-      makeHostItem(title: "Kondisi Baterai", icon: .battery, initialState: .success),
-      makeHostItem(title: "Tes Jailbreak", icon: .jailbreak, initialState: .success),
-      makeHostItem(title: "Build environment configuration is highly specialized, and it’s possible that you or your team have different conventions, but this is one way to approach the problem.", icon: .biometricOne, initialState: .failed),
-      makeHostItem(title: "Tes Biometric 2", icon: .biometricTwo, initialState: .success),
-      makeHostItem(title: "Tombol Silent", icon: .silent, initialState: .failed),
-      makeHostItem(title: "Tombol Volume", icon: .volume, initialState: .success),
-      makeHostItem(title: "Tombol On/Off", icon: .power, initialState: .success),
-      makeHostItem(title: "Tes Kamera", icon: .camera, initialState: .success),
-      makeHostItem(title: "Tes Layar Sentuh", icon: .touch, initialState: .success),
-      makeHostItem(title: "Tes Kartu SIM", icon: .sim, initialState: .success),
+      makeHostItem(
+        title: "When you're ready to move toward production for your app, you can setup your Xcode build system to point different build targets to different Convex deployments.",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .failed,
+      ),
+      makeHostItem(
+        title: "Kondisi Baterai",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Tes Jailbreak",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Build environment configuration is highly specialized, and it’s possible that you or your team have different conventions, but this is one way to approach the problem.",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .failed,
+      ),
+      makeHostItem(
+        title: "Tes Biometric 2",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Tombol Silent",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .failed,
+      ),
+      makeHostItem(
+        title: "Tombol Volume",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Tombol On/Off",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Tes Kamera",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Tes Layar Sentuh",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
+      makeHostItem(
+        title: "Tes Kartu SIM",
+        initialIconAssetName: "fingerInitialImage",
+        failedIconAssetName: "fingerFailedImage",
+        successIconAssetName: "fingerSuccessImage",
+        statusAssetName: "successImage",
+        initialResult: .success,
+      ),
     ]
   }
 
   private func makeHostItem(
     title: String,
-    icon: BetaTestItem.IconType,
-    initialState: BetaTestCardState,
-    retryState: BetaTestCardState = .failed,
+    initialIconAssetName: String? = nil,
+    failedIconAssetName: String? = nil,
+    successIconAssetName: String? = nil,
+    statusAssetName: String? = "successImage",
+    initialResult: BetaTestCardState,
+    retryResult: BetaTestCardState = .failed,
     simulatedDuration: TimeInterval = 0.25,
   ) -> BetaTestModuleConfiguration.Item {
     BetaTestModuleConfiguration.Item(
       title: title,
-      icon: icon,
-      initialState: initialState,
-      retryState: retryState,
-      simulatedDuration: simulatedDuration,
+      initialIconAssetName: initialIconAssetName,
+      failedIconAssetName: failedIconAssetName,
+      successIconAssetName: successIconAssetName,
+      statusAssetName: statusAssetName,
+      executionHandler: { phase, completion in
+        let result = phase == .initial ? initialResult : retryResult
+        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
+          completion(result)
+        }
+      },
     )
+  }
+
+  private func triggerRetryIfAvailable(on viewController: BetaTestViewController, index: Int) {
+    viewController.retryItem(at: index)
   }
 
 }

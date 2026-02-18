@@ -3,26 +3,29 @@ import Foundation
 enum BetaTestModuleConfiguration {
   struct Item {
     var title: String
-    var icon: BetaTestItem.IconType
-    var initialState: BetaTestCardState
-    var retryState: BetaTestCardState
+    var initialIconAssetName: String?
+    var failedIconAssetName: String?
+    var successIconAssetName: String?
+    var statusAssetName: String?
     var retryButtonTitle: String
-    var simulatedDuration: TimeInterval
+    var executionHandler: BetaTestItem.ExecutionHandler
 
     init(
       title: String,
-      icon: BetaTestItem.IconType,
-      initialState: BetaTestCardState,
-      retryState: BetaTestCardState = .success,
+      initialIconAssetName: String? = nil,
+      failedIconAssetName: String? = nil,
+      successIconAssetName: String? = nil,
+      statusAssetName: String? = "successImage",
       retryButtonTitle: String = "Ulangi",
-      simulatedDuration: TimeInterval = 0.25,
+      executionHandler: @escaping BetaTestItem.ExecutionHandler,
     ) {
       self.title = title
-      self.icon = icon
-      self.initialState = initialState
-      self.retryState = retryState
+      self.initialIconAssetName = initialIconAssetName
+      self.failedIconAssetName = failedIconAssetName
+      self.successIconAssetName = successIconAssetName
+      self.statusAssetName = statusAssetName
       self.retryButtonTitle = retryButtonTitle
-      self.simulatedDuration = simulatedDuration
+      self.executionHandler = executionHandler
     }
   }
 
@@ -49,15 +52,27 @@ enum BetaTestModuleConfiguration {
     var items: [Item]
     var layoutStrategy: BetaTestLayoutStrategy
     var screen: Screen
+    var onProcessingEvent: ((BetaTestViewController.ProcessingEvent) -> Void)?
+    var onRetryCompleted: ((BetaTestViewController.ProcessResult) -> Void)?
+    var onContinueButtonTapped: (() -> Void)?
+    var onRetryButtonTapped: ((_ index: Int, _ title: String) -> Void)?
 
     init(
       items: [Item],
       layoutStrategy: BetaTestLayoutStrategy = .adaptiveMosaic,
       screen: Screen = .init(),
+      onProcessingEvent: ((BetaTestViewController.ProcessingEvent) -> Void)? = nil,
+      onRetryCompleted: ((BetaTestViewController.ProcessResult) -> Void)? = nil,
+      onContinueButtonTapped: (() -> Void)? = nil,
+      onRetryButtonTapped: ((_ index: Int, _ title: String) -> Void)? = nil,
     ) {
       self.items = items
       self.layoutStrategy = layoutStrategy
       self.screen = screen
+      self.onProcessingEvent = onProcessingEvent
+      self.onRetryCompleted = onRetryCompleted
+      self.onContinueButtonTapped = onContinueButtonTapped
+      self.onRetryButtonTapped = onRetryButtonTapped
     }
   }
 }

@@ -32,8 +32,11 @@ final class Tester_OneUITests: XCTestCase {
 
   @MainActor
   func testLaunchPerformance() {
-    // This measures how long it takes to launch your application.
-    measure(metrics: [XCTApplicationLaunchMetric()]) {
+    if #available(iOS 13.0, *) {
+      measure(metrics: [XCTApplicationLaunchMetric()]) {
+        XCUIApplication().launch()
+      }
+    } else {
       XCUIApplication().launch()
     }
   }

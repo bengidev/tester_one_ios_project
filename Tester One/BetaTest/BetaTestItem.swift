@@ -15,16 +15,25 @@ struct BetaTestItem {
 
   struct Content {
     var title: String
-    var icon: IconType
+    var initialIconAssetName: String?
+    var failedIconAssetName: String?
+    var successIconAssetName: String?
+    var statusAssetName: String?
     var retryButtonTitle: String
 
     init(
       title: String,
-      icon: IconType,
+      initialIconAssetName: String? = nil,
+      failedIconAssetName: String? = nil,
+      successIconAssetName: String? = nil,
+      statusAssetName: String? = "successImage",
       retryButtonTitle: String = "Ulangi",
     ) {
       self.title = title
-      self.icon = icon
+      self.initialIconAssetName = initialIconAssetName
+      self.failedIconAssetName = failedIconAssetName
+      self.successIconAssetName = successIconAssetName
+      self.statusAssetName = statusAssetName
       self.retryButtonTitle = retryButtonTitle
     }
   }
@@ -34,37 +43,35 @@ struct BetaTestItem {
     case retry
   }
 
-  enum IconType: CaseIterable {
-    case cpu
-    case hardDisk
-    case battery
-    case jailbreak
-    case biometricOne
-    case biometricTwo
-    case silent
-    case volume
-    case power
-    case camera
-    case touch
-    case sim
-  }
-
   var content: Content
   var state: BetaTestCardState
   var executionHandler: ExecutionHandler?
 
   var title: String { content.title }
-  var icon: IconType { content.icon }
+  var initialIconAssetName: String? { content.initialIconAssetName }
+  var failedIconAssetName: String? { content.failedIconAssetName }
+  var successIconAssetName: String? { content.successIconAssetName }
+  var statusAssetName: String? { content.statusAssetName }
   var accessibilityToken: String { Self.makeAccessibilityToken(from: content.title) }
 
   init(
     title: String,
-    icon: IconType,
+    initialIconAssetName: String? = nil,
+    failedIconAssetName: String? = nil,
+    successIconAssetName: String? = nil,
+    statusAssetName: String? = "successImage",
     state: BetaTestCardState,
     retryButtonTitle: String = "Ulangi",
     executionHandler: ExecutionHandler? = nil,
   ) {
-    content = Content(title: title, icon: icon, retryButtonTitle: retryButtonTitle)
+    content = Content(
+      title: title,
+      initialIconAssetName: initialIconAssetName,
+      failedIconAssetName: failedIconAssetName,
+      successIconAssetName: successIconAssetName,
+      statusAssetName: statusAssetName,
+      retryButtonTitle: retryButtonTitle,
+    )
     self.state = state
     self.executionHandler = executionHandler
   }

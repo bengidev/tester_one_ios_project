@@ -26,8 +26,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   }
 
   static func clearFallbackImageCache() {
-    fallbackImageCache.removeAll()
-    preferredHeightCache.removeAll()
+    fallbackImage = nil
   }
 
   static func preferredHeight(
@@ -38,14 +37,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     guard itemWidth > 0 else { return 0 }
 
     let roundedWidth = (itemWidth * 100).rounded() / 100
-    let cacheKey = PreferredHeightCacheKey(
-      roundedWidthKey: Int((roundedWidth * 100).rounded()),
-      contentSizeCategory: traitCollection.preferredContentSizeCategory,
-      title: title,
-    )
-    if let cachedHeight = preferredHeightCache[cacheKey] {
-      return cachedHeight
-    }
 
     // Use an offscreen sizing cell so measured height exactly matches runtime Auto Layout.
     let cell = sizingCell
@@ -72,12 +63,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       traitCollection: traitCollection,
     )
 
-    let resolvedHeight = ceil(max(measured.height, minimumHeight))
-    if preferredHeightCache.count > 2000 {
-      preferredHeightCache.removeAll(keepingCapacity: true)
-    }
-    preferredHeightCache[cacheKey] = resolvedHeight
-    return resolvedHeight
+    return ceil(max(measured.height, minimumHeight))
   }
 
   static func preferredHeightsByRow(
@@ -160,8 +146,8 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     titleLabel.text = item.title
     retryBadgeButton.setTitle(item.content.retryButtonTitle, for: .normal)
 
-    applyState(item.state)
-    applyIcon(for: item.icon, state: item.state)
+    applyState(item.state, item: item)
+    applyIcon(item: item, state: item.state)
   }
 
   override func layoutSubviews() {
@@ -182,8 +168,8 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     let applyChanges = { [self] in
       titleLabel.text = item.title
       retryBadgeButton.setTitle(item.content.retryButtonTitle, for: .normal)
-      applyState(state)
-      applyIcon(for: item.icon, state: state)
+      applyState(state, item: item)
+      applyIcon(item: item, state: state)
       layoutIfNeeded()
     }
 
@@ -222,42 +208,21 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     let retryHorizontalInset: CGFloat
   }
 
-  private struct PreferredHeightCacheKey: Hashable {
-    let roundedWidthKey: Int
-    let contentSizeCategory: UIContentSizeCategory
-    let title: String
-  }
-
   private enum Layout {
     static let cornerRadius: CGFloat = 20
     static let cardInset: CGFloat = 0
     static let contentInset: CGFloat = 15
     static let titleBottomInset: CGFloat = 15
     static let iconCircleSize: CGFloat = 50
-    static let iconSize: CGFloat = 25
+    static let iconSize: CGFloat = 50
     static let statusSize: CGFloat = 30
     static let topRowSpacing: CGFloat = 20
     static let retryHeight: CGFloat = 30
     static let minimumMeasuredCardHeight: CGFloat = 120
   }
 
-  private static let fallbackAssetNamesByIcon: [BetaTestItem.IconType: [String]] = [
-    .cpu: ["cpuImage", "failedImage"],
-    .hardDisk: ["hardDiskImage", "storageImage", "cpuImage", "failedImage"],
-    .battery: ["batteryImage", "cpuImage", "failedImage"],
-    .jailbreak: ["securityImage", "cpuImage", "failedImage"],
-    .biometricOne: ["faceIDImage", "biometricImage", "cpuImage", "failedImage"],
-    .biometricTwo: ["touchIDImage", "biometricImage", "cpuImage", "failedImage"],
-    .silent: ["silentImage", "audioImage", "cpuImage", "failedImage"],
-    .volume: ["volumeImage", "audioImage", "cpuImage", "failedImage"],
-    .power: ["powerImage", "cpuImage", "failedImage"],
-    .camera: ["cameraImage", "cpuImage", "failedImage"],
-    .touch: ["touchImage", "screenImage", "cpuImage", "failedImage"],
-    .sim: ["simImage", "networkImage", "cpuImage", "failedImage"],
-  ]
-
-  private static var fallbackImageCache = [BetaTestItem.IconType: UIImage?]()
-  private static var preferredHeightCache = [PreferredHeightCacheKey: CGFloat]()
+  private static let fallbackAssetName = "cpuImage"
+  private static var fallbackImage: UIImage?
   private static let sizingCell = BetaTestCollectionViewCell(frame: .zero)
 
   private var currentMetrics: ScaledMetrics?
@@ -360,21 +325,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     label.preferredMaxLayoutWidth = 0
     return label
   }()
-
-  private static func successStatusImage() -> UIImage? {
-    if let image = UIImage(named: "successImage") {
-      return image.withRenderingMode(.alwaysOriginal)
-    }
-
-    if #available(iOS 13.0, *) {
-      return UIImage(systemName: "checkmark.circle.fill")?.withTintColor(
-        UIColor.betaTestStatusGreen,
-        renderingMode: .alwaysOriginal,
-      )
-    }
-
-    return nil
-  }
 
   private static func widthScaleFactor(for referenceWidth: CGFloat) -> CGFloat {
     switch referenceWidth {
@@ -587,35 +537,35 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.cardInset),
       cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Layout.cardInset),
 
-      iconCircleLeadingConstraint,
-      iconCircleTopConstraint,
-      iconCircleWidthConstraint,
-      iconCircleHeightConstraint,
+      iconCircleLeadingConstraint!,
+      iconCircleTopConstraint!,
+      iconCircleWidthConstraint!,
+      iconCircleHeightConstraint!,
 
       iconImageView.centerXAnchor.constraint(equalTo: iconCircleView.centerXAnchor),
       iconImageView.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      iconImageWidthConstraint,
-      iconImageHeightConstraint,
+      iconImageWidthConstraint!,
+      iconImageHeightConstraint!,
 
-      statusTrailingConstraint,
+      statusTrailingConstraint!,
       statusImageView.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      statusWidthConstraint,
-      statusHeightConstraint,
+      statusWidthConstraint!,
+      statusHeightConstraint!,
 
-      loadingTrailingConstraint,
+      loadingTrailingConstraint!,
       loadingIndicator.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      loadingWidthConstraint,
-      loadingHeightConstraint,
+      loadingWidthConstraint!,
+      loadingHeightConstraint!,
 
-      retryTrailingConstraint,
+      retryTrailingConstraint!,
       retryBadgeButton.centerYAnchor.constraint(equalTo: iconCircleView.centerYAnchor),
-      retryHeightConstraint,
+      retryHeightConstraint!,
 
-      titleLeadingConstraint,
-      titleTrailingConstraint,
-      titleTopConstraint,
-      titleBottomConstraint,
-    ].compactMap { $0 })
+      titleLeadingConstraint!,
+      titleTrailingConstraint!,
+      titleTopConstraint!,
+      titleBottomConstraint!,
+    ])
 
     applyScaledMetricsIfNeeded(force: true)
   }
@@ -626,7 +576,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     onRetryTapped?()
   }
 
-  private func applyState(_ state: BetaTestCardState) {
+  private func applyState(_ state: BetaTestCardState, item: BetaTestItem) {
     retryBadgeButton.isHidden = true
     statusImageView.isHidden = true
     loadingIndicator.stopAnimating()
@@ -650,19 +600,44 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       cardView.layer.borderColor = UIColor.betaTestSapGreen.cgColor
       cardView.layer.borderWidth = 1
       iconCircleView.backgroundColor = UIColor.betaTestSuccessCircle
-      statusImageView.isHidden = false
-      statusImageView.image = Self.successStatusImage()
+      statusImageView.tintColor = UIColor.betaTestSapGreen
+      let successImage = statusImage(item: item)
+      statusImageView.image = successImage
+      statusImageView.isHidden = successImage == nil
 
     case .failed:
       cardView.backgroundColor = .betaTestSurface
       cardView.layer.borderColor = UIColor.betaTestErrorRed.cgColor
       cardView.layer.borderWidth = 1
       iconCircleView.backgroundColor = UIColor.betaTestErrorCircle
-      retryBadgeButton.isHidden = false
+      let retryTitle = retryBadgeButton.title(for: .normal) ?? ""
+      let shouldShowRetryButton = retryTitle.isEmpty == false
+
+      retryBadgeButton.isHidden = !shouldShowRetryButton
+
+      if shouldShowRetryButton {
+        statusImageView.image = nil
+        statusImageView.isHidden = true
+      } else {
+        statusImageView.tintColor = UIColor.betaTestErrorRed
+        let failedImage = statusImage(item: item)
+        statusImageView.image = failedImage
+        statusImageView.isHidden = failedImage == nil
+      }
     }
   }
 
-  private func applyIcon(for icon: BetaTestItem.IconType, state: BetaTestCardState) {
+  private func statusImage(item: BetaTestItem) -> UIImage? {
+    guard let configuredAssetName = item.statusAssetName else { return nil }
+
+    if let configuredImage = UIImage(named: configuredAssetName) {
+      return configuredImage.withRenderingMode(.alwaysOriginal)
+    }
+
+    return fallbackImage()?.withRenderingMode(.alwaysTemplate)
+  }
+
+  private func applyIcon(item: BetaTestItem, state: BetaTestCardState) {
     let tintColor =
       switch state {
       case .failed:
@@ -673,67 +648,50 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
         UIColor.betaTestSapGreen
       }
 
-    if #available(iOS 13.0, *) {
-      let pointSize = currentMetrics?.iconSize ?? Layout.iconSize
-      let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
-      if let symbolImage = UIImage(systemName: systemSymbolName(for: icon), withConfiguration: config) {
-        iconImageView.tintColor = tintColor
-        iconImageView.image = symbolImage.withRenderingMode(.alwaysTemplate)
-        return
-      }
-    }
-
-    if let fallbackImage = fallbackImage(for: icon) {
+    if let image = configuredIconImage(named: iconAssetName(for: item, state: state)) {
+      iconImageView.image = image.withRenderingMode(.alwaysOriginal)
+    } else if let image = fallbackImage() {
       iconImageView.tintColor = tintColor
-      iconImageView.image = fallbackImage.withRenderingMode(.alwaysTemplate)
+      iconImageView.image = image.withRenderingMode(.alwaysTemplate)
     } else {
       iconImageView.image = nil
     }
   }
 
-  private func fallbackImage(for icon: BetaTestItem.IconType) -> UIImage? {
+  private func iconAssetName(for item: BetaTestItem, state: BetaTestCardState) -> String? {
+    switch state {
+    case .initial, .loading:
+      item.initialIconAssetName ?? item.failedIconAssetName ?? item.successIconAssetName
+    case .failed:
+      item.failedIconAssetName ?? item.initialIconAssetName ?? item.successIconAssetName
+    case .success:
+      item.successIconAssetName ?? item.initialIconAssetName ?? item.failedIconAssetName
+    }
+  }
+
+  private func configuredIconImage(named iconAssetName: String?) -> UIImage? {
     assert(Thread.isMainThread, "UI image lookups should happen on main thread.")
 
-    if let cached = Self.fallbackImageCache[icon] {
+    if let iconAssetName, let image = UIImage(named: iconAssetName) {
+      return image
+    }
+
+    return nil
+  }
+
+  private func fallbackImage() -> UIImage? {
+    assert(Thread.isMainThread, "UI image lookups should happen on main thread.")
+
+    if let cached = Self.fallbackImage {
       return cached
     }
 
-    let resolvedImage = fallbackAssetNames(for: icon).lazy.compactMap { UIImage(named: $0) }.first
-    Self.fallbackImageCache[icon] = resolvedImage
-    return resolvedImage
-  }
-
-  private func fallbackAssetNames(for icon: BetaTestItem.IconType) -> [String] {
-    Self.fallbackAssetNamesByIcon[icon] ?? ["cpuImage", "failedImage"]
-  }
-
-  private func systemSymbolName(for icon: BetaTestItem.IconType) -> String {
-    switch icon {
-    case .cpu:
-      "cpu"
-    case .hardDisk:
-      "externaldrive"
-    case .battery:
-      "battery.100"
-    case .jailbreak:
-      "key"
-    case .biometricOne:
-      "faceid"
-    case .biometricTwo:
-      "touchid"
-    case .silent:
-      "bell.slash"
-    case .volume:
-      "speaker.wave.2.fill"
-    case .power:
-      "power"
-    case .camera:
-      "camera"
-    case .touch:
-      "hand.point.up.left.fill"
-    case .sim:
-      "simcard"
+    guard let resolvedImage = UIImage(named: Self.fallbackAssetName) else {
+      return nil
     }
+
+    Self.fallbackImage = resolvedImage
+    return resolvedImage
   }
 
 }

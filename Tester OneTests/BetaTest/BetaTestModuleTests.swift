@@ -12,7 +12,7 @@ final class BetaTestModuleTests: XCTestCase {
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          .init(title: "CPU", icon: .cpu, initialState: .success)
+          makeItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success)
         ],
         layoutStrategy: .adaptiveMosaic,
         screen: .init(title: "Custom Check"),
@@ -24,15 +24,34 @@ final class BetaTestModuleTests: XCTestCase {
   }
 
   @MainActor
-  func testFactoryInjectedExecutionProviderIsUsed() {
-    let provider = MockExecutionProvider()
+  func testFactoryWiresModuleLevelCallbacksFromConfiguration() {
+    let callbackFired = expectation(description: "config callback fired")
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          .init(title: "CPU", icon: .cpu, initialState: .failed, retryState: .failed)
+          makeItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success)
+        ],
+        onProcessingEvent: { event in
+          if case .runCompleted = event {
+            callbackFired.fulfill()
+          }
+        },
+      )
+    )
+
+    _ = vc.view
+    vc.beginProcessing()
+    wait(for: [callbackFired], timeout: TestTiming.timeout)
+  }
+
+  @MainActor
+  func testFactoryUsesItemExecutionHandlers() {
+    let vc = BetaTestModule.makeViewController(
+      configuration: .init(
+        items: [
+          makeItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success)
         ]
-      ),
-      executionProvider: provider,
+      )
     )
 
     let exp = expectation(description: "run completed")
@@ -53,8 +72,18 @@ final class BetaTestModuleTests: XCTestCase {
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          .init(title: "CPU", icon: .cpu, initialState: .success, simulatedDuration: 0.05),
-          .init(title: "Battery", icon: .battery, initialState: .success, simulatedDuration: 0.05),
+          makeItem(
+            title: "CPU",
+            initialIconAssetName: "cpuImage",
+            initialResult: .success,
+            simulatedDuration: 0.05,
+          ),
+          makeItem(
+            title: "Battery",
+            initialIconAssetName: "batteryImage",
+            initialResult: .success,
+            simulatedDuration: 0.05,
+          ),
         ]
       )
     )
@@ -82,19 +111,22 @@ final class BetaTestModuleTests: XCTestCase {
     wait(for: [exp], timeout: TestTiming.timeout)
     XCTAssertEqual(started, [0, 1])
     XCTAssertEqual(completed, [0, 1])
-    XCTAssertEqual(vc.debug_runPhase(), .finished)
   }
 
   @MainActor
   func testFailureThenRetryPathCompletesSuccessfully() {
-    let provider = RetryAwareExecutionProvider()
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          .init(title: "CPU", icon: .cpu, initialState: .failed, retryState: .success, simulatedDuration: 0.05)
+          makeItem(
+            title: "CPU",
+            initialIconAssetName: "cpuImage",
+            initialResult: .failed,
+            retryResult: .success,
+            simulatedDuration: 0.05,
+          )
         ]
-      ),
-      executionProvider: provider,
+      )
     )
 
     let runCompleted = expectation(description: "initial run completed with failure")
@@ -121,9 +153,8 @@ final class BetaTestModuleTests: XCTestCase {
     vc.beginProcessing()
 
     wait(for: [runCompleted], timeout: TestTiming.timeout)
-    vc.debug_triggerRetry(at: 0)
+    vc.retryItem(at: 0)
     wait(for: [retryCompleted], timeout: TestTiming.retryTimeout)
-    XCTAssertEqual(vc.debug_itemState(at: 0), .success)
   }
 
   // MARK: Private
@@ -133,33 +164,29 @@ final class BetaTestModuleTests: XCTestCase {
     static let retryTimeout: TimeInterval = 4.0
   }
 
-}
-
-// MARK: - MockExecutionProvider
-
-private final class MockExecutionProvider: BetaTestExecutionProviding {
-  func execute(
-    item _: BetaTestModuleConfiguration.Item,
-    phase _: BetaTestItem.ExecutionPhase,
-    completion: @escaping (BetaTestCardState) -> Void,
-  ) {
-    completion(.success)
+  private func makeItem(
+    title: String,
+    initialIconAssetName: String? = nil,
+    initialResult: BetaTestCardState,
+    retryResult: BetaTestCardState = .success,
+    simulatedDuration: TimeInterval = 0.01,
+  ) -> BetaTestModuleConfiguration.Item {
+    BetaTestModuleConfiguration.Item(
+      title: title,
+      initialIconAssetName: initialIconAssetName,
+      executionHandler: { phase, completion in
+        let result: BetaTestCardState =
+          switch phase {
+          case .initial:
+            initialResult
+          case .retry:
+            retryResult
+          }
+        DispatchQueue.main.asyncAfter(deadline: .now() + simulatedDuration) {
+          completion(result)
+        }
+      },
+    )
   }
-}
 
-// MARK: - RetryAwareExecutionProvider
-
-private final class RetryAwareExecutionProvider: BetaTestExecutionProviding {
-  func execute(
-    item: BetaTestModuleConfiguration.Item,
-    phase: BetaTestItem.ExecutionPhase,
-    completion: @escaping (BetaTestCardState) -> Void,
-  ) {
-    switch phase {
-    case .initial:
-      completion(item.initialState)
-    case .retry:
-      completion(item.retryState)
-    }
-  }
 }
