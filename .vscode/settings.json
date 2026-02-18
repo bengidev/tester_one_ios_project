@@ -1,3 +1,14 @@
 {
-    "swift.SDK": "/Applications/Xcode-26.2.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk"
+    "swift.path": "/Applications/Xcode-26.2.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+    "swift.swiftEnvironmentVariables": {
+        "DEVELOPER_DIR": "/Applications/Xcode-26.2.0.app/Contents/Developer"
+    },
+    "editor.hover.enabled": "on",
+    "swift.sourcekit-lsp.disable": false,
+    "swift.sourcekit-lsp.serverArguments": [
+        "--default-workspace-type",
+        "buildServer"
+    ],
+    "swift.outputChannelLogLevel": "debug",
+    "swift.sourcekit-lsp.trace.server": "verbose"
 }
