@@ -17,6 +17,9 @@ build/
 # Design assets
 Tester One/Image Concepts/
 
+# Local planning artifacts
+.sisyphus/
+
 # Workspace checks
 *.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
 *.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
