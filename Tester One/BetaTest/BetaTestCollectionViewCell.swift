@@ -221,7 +221,6 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     static let minimumMeasuredCardHeight: CGFloat = 120
   }
 
-  private static let fallbackAssetName = "cpuImage"
   private static var fallbackImage: UIImage?
   private static let sizingCell = BetaTestCollectionViewCell(frame: .zero)
 
@@ -628,9 +627,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
   }
 
   private func statusImage(item: BetaTestItem) -> UIImage? {
-    guard let configuredAssetName = item.statusAssetName else { return nil }
-
-    if let configuredImage = UIImage(named: configuredAssetName) {
+    if let configuredImage = resolvedUsableImage(item.statusImage) {
       return configuredImage.withRenderingMode(.alwaysOriginal)
     }
 
@@ -648,7 +645,7 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
         UIColor.betaTestSapGreen
       }
 
-    if let image = configuredIconImage(named: iconAssetName(for: item, state: state)) {
+    if let image = configuredIconImage(item: item, state: state) {
       iconImageView.image = image.withRenderingMode(.alwaysOriginal)
     } else if let image = fallbackImage() {
       iconImageView.tintColor = tintColor
@@ -658,25 +655,32 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
     }
   }
 
-  private func iconAssetName(for item: BetaTestItem, state: BetaTestCardState) -> String? {
+  private func iconImages(for item: BetaTestItem, state: BetaTestCardState) -> [UIImage?] {
     switch state {
     case .initial, .loading:
-      item.initialIconAssetName ?? item.failedIconAssetName ?? item.successIconAssetName
+      [item.initialIconImage, item.failedIconImage, item.successIconImage]
     case .failed:
-      item.failedIconAssetName ?? item.initialIconAssetName ?? item.successIconAssetName
+      [item.failedIconImage, item.initialIconImage, item.successIconImage]
     case .success:
-      item.successIconAssetName ?? item.initialIconAssetName ?? item.failedIconAssetName
+      [item.successIconImage, item.initialIconImage, item.failedIconImage]
     }
   }
 
-  private func configuredIconImage(named iconAssetName: String?) -> UIImage? {
-    assert(Thread.isMainThread, "UI image lookups should happen on main thread.")
-
-    if let iconAssetName, let image = UIImage(named: iconAssetName) {
-      return image
+  private func configuredIconImage(item: BetaTestItem, state: BetaTestCardState) -> UIImage? {
+    for image in iconImages(for: item, state: state) {
+      if let usableImage = resolvedUsableImage(image) {
+        return usableImage
+      }
     }
 
     return nil
+  }
+
+  private func resolvedUsableImage(_ image: UIImage?) -> UIImage? {
+    guard let image else { return nil }
+    guard image.size.width > 0, image.size.height > 0 else { return nil }
+    guard image.cgImage != nil || image.ciImage != nil else { return nil }
+    return image
   }
 
   private func fallbackImage() -> UIImage? {
@@ -686,8 +690,22 @@ final class BetaTestCollectionViewCell: UICollectionViewCell {
       return cached
     }
 
-    guard let resolvedImage = UIImage(named: Self.fallbackAssetName) else {
-      return nil
+    let imageSize = CGSize(width: 50, height: 50)
+    let renderer = UIGraphicsImageRenderer(size: imageSize)
+    let resolvedImage = renderer.image { context in
+      let rect = CGRect(origin: .zero, size: imageSize).insetBy(dx: 6, dy: 6)
+      UIColor.black.setStroke()
+      let path = UIBezierPath(roundedRect: rect, cornerRadius: 10)
+      path.lineWidth = 3
+      path.stroke()
+
+      context.cgContext.setLineWidth(3)
+      context.cgContext.setStrokeColor(UIColor.black.cgColor)
+      context.cgContext.move(to: CGPoint(x: rect.minX + 7, y: rect.minY + 7))
+      context.cgContext.addLine(to: CGPoint(x: rect.maxX - 7, y: rect.maxY - 7))
+      context.cgContext.move(to: CGPoint(x: rect.maxX - 7, y: rect.minY + 7))
+      context.cgContext.addLine(to: CGPoint(x: rect.minX + 7, y: rect.maxY - 7))
+      context.cgContext.strokePath()
     }
 
     Self.fallbackImage = resolvedImage

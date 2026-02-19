@@ -12,7 +12,7 @@ final class BetaTestModuleTests: XCTestCase {
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          makeItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success)
+          makeItem(title: "CPU", initialResult: .success)
         ],
         layoutStrategy: .adaptiveMosaic,
         screen: .init(title: "Custom Check"),
@@ -29,7 +29,7 @@ final class BetaTestModuleTests: XCTestCase {
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          makeItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success)
+          makeItem(title: "CPU", initialResult: .success)
         ],
         onProcessingEvent: { event in
           if case .runCompleted = event {
@@ -49,7 +49,7 @@ final class BetaTestModuleTests: XCTestCase {
     let vc = BetaTestModule.makeViewController(
       configuration: .init(
         items: [
-          makeItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success)
+          makeItem(title: "CPU", initialResult: .success)
         ]
       )
     )
@@ -74,13 +74,11 @@ final class BetaTestModuleTests: XCTestCase {
         items: [
           makeItem(
             title: "CPU",
-            initialIconAssetName: "cpuImage",
             initialResult: .success,
             simulatedDuration: 0.05,
           ),
           makeItem(
             title: "Battery",
-            initialIconAssetName: "batteryImage",
             initialResult: .success,
             simulatedDuration: 0.05,
           ),
@@ -120,7 +118,6 @@ final class BetaTestModuleTests: XCTestCase {
         items: [
           makeItem(
             title: "CPU",
-            initialIconAssetName: "cpuImage",
             initialResult: .failed,
             retryResult: .success,
             simulatedDuration: 0.05,
@@ -166,14 +163,12 @@ final class BetaTestModuleTests: XCTestCase {
 
   private func makeItem(
     title: String,
-    initialIconAssetName: String? = nil,
     initialResult: BetaTestCardState,
     retryResult: BetaTestCardState = .success,
     simulatedDuration: TimeInterval = 0.01,
   ) -> BetaTestModuleConfiguration.Item {
     BetaTestModuleConfiguration.Item(
       title: title,
-      initialIconAssetName: initialIconAssetName,
       executionHandler: { phase, completion in
         let result: BetaTestCardState =
           switch phase {

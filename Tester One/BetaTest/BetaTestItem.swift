@@ -3,7 +3,7 @@
 //  Tester One
 //
 
-import Foundation
+import UIKit
 
 struct BetaTestItem {
 
@@ -15,25 +15,25 @@ struct BetaTestItem {
 
   struct Content {
     var title: String
-    var initialIconAssetName: String?
-    var failedIconAssetName: String?
-    var successIconAssetName: String?
-    var statusAssetName: String?
+    var initialIconImage: UIImage?
+    var failedIconImage: UIImage?
+    var successIconImage: UIImage?
+    var statusImage: UIImage?
     var retryButtonTitle: String
 
     init(
       title: String,
-      initialIconAssetName: String? = nil,
-      failedIconAssetName: String? = nil,
-      successIconAssetName: String? = nil,
-      statusAssetName: String? = "successImage",
+      initialIconImage: UIImage? = nil,
+      failedIconImage: UIImage? = nil,
+      successIconImage: UIImage? = nil,
+      statusImage: UIImage? = nil,
       retryButtonTitle: String = "Ulangi",
     ) {
       self.title = title
-      self.initialIconAssetName = initialIconAssetName
-      self.failedIconAssetName = failedIconAssetName
-      self.successIconAssetName = successIconAssetName
-      self.statusAssetName = statusAssetName
+      self.initialIconImage = initialIconImage
+      self.failedIconImage = failedIconImage
+      self.successIconImage = successIconImage
+      self.statusImage = statusImage
       self.retryButtonTitle = retryButtonTitle
     }
   }
@@ -48,28 +48,28 @@ struct BetaTestItem {
   var executionHandler: ExecutionHandler?
 
   var title: String { content.title }
-  var initialIconAssetName: String? { content.initialIconAssetName }
-  var failedIconAssetName: String? { content.failedIconAssetName }
-  var successIconAssetName: String? { content.successIconAssetName }
-  var statusAssetName: String? { content.statusAssetName }
+  var initialIconImage: UIImage? { content.initialIconImage }
+  var failedIconImage: UIImage? { content.failedIconImage }
+  var successIconImage: UIImage? { content.successIconImage }
+  var statusImage: UIImage? { content.statusImage }
   var accessibilityToken: String { Self.makeAccessibilityToken(from: content.title) }
 
   init(
     title: String,
-    initialIconAssetName: String? = nil,
-    failedIconAssetName: String? = nil,
-    successIconAssetName: String? = nil,
-    statusAssetName: String? = "successImage",
+    initialIconImage: UIImage? = nil,
+    failedIconImage: UIImage? = nil,
+    successIconImage: UIImage? = nil,
+    statusImage: UIImage? = nil,
     state: BetaTestCardState,
     retryButtonTitle: String = "Ulangi",
     executionHandler: ExecutionHandler? = nil,
   ) {
     content = Content(
       title: title,
-      initialIconAssetName: initialIconAssetName,
-      failedIconAssetName: failedIconAssetName,
-      successIconAssetName: successIconAssetName,
-      statusAssetName: statusAssetName,
+      initialIconImage: initialIconImage,
+      failedIconImage: failedIconImage,
+      successIconImage: successIconImage,
+      statusImage: statusImage,
       retryButtonTitle: retryButtonTitle,
     )
     self.state = state

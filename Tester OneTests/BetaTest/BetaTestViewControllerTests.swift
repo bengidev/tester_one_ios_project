@@ -12,7 +12,7 @@ final class Tester_OneTests: XCTestCase {
 
   @MainActor
   func testBetaTestItemAccessibilityTokenNormalization() {
-    let item = BetaTestItem(title: "Tes Kartu SIM #1", initialIconAssetName: "simImage", state: .initial)
+    let item = BetaTestItem(title: "Tes Kartu SIM #1", state: .initial)
     XCTAssertEqual(item.accessibilityToken, "tes_kartu_sim_1")
   }
 
@@ -113,7 +113,6 @@ final class Tester_OneTests: XCTestCase {
     var items = makeFixtureItems()
     items[0] = makeFixtureItem(
       title: "Tester",
-      initialIconAssetName: "securityImage",
       initialResult: .failed,
       simulatedDuration: 0.10,
     )
@@ -156,7 +155,6 @@ final class Tester_OneTests: XCTestCase {
     var items = makeFixtureItems()
     items[0] = makeFixtureItem(
       title: "Tester",
-      initialIconAssetName: "securityImage",
       initialResult: .failed,
       retryResult: .success,
     )
@@ -190,7 +188,6 @@ final class Tester_OneTests: XCTestCase {
     let longItems = (1...24).map { index in
       makeFixtureItem(
         title: "Item \(index) lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        initialIconAssetName: "cpuImage",
         initialResult: .success,
         simulatedDuration: 0.03,
       )
@@ -223,31 +220,29 @@ final class Tester_OneTests: XCTestCase {
 
   private func makeFixtureItems() -> [BetaTestItem] {
     [
-      makeFixtureItem(title: "Tester", initialIconAssetName: "securityImage", initialResult: .success),
-      makeFixtureItem(title: "CPU", initialIconAssetName: "cpuImage", initialResult: .success),
-      makeFixtureItem(title: "Hard Disk", initialIconAssetName: "hardDiskImage", initialResult: .success),
-      makeFixtureItem(title: "Kondisi Baterai", initialIconAssetName: "batteryImage", initialResult: .success),
-      makeFixtureItem(title: "Tes Jailbreak", initialIconAssetName: "securityImage", initialResult: .success),
-      makeFixtureItem(title: "Tes Biometric 1", initialIconAssetName: "faceIDImage", initialResult: .success),
-      makeFixtureItem(title: "Tombol Silent", initialIconAssetName: "silentImage", initialResult: .failed),
-      makeFixtureItem(title: "Tombol Volume", initialIconAssetName: "volumeImage", initialResult: .success),
-      makeFixtureItem(title: "Tombol On/Off", initialIconAssetName: "powerImage", initialResult: .success),
-      makeFixtureItem(title: "Tes Kamera", initialIconAssetName: "cameraImage", initialResult: .success),
-      makeFixtureItem(title: "Tes Layar Sentuh", initialIconAssetName: "touchImage", initialResult: .success),
-      makeFixtureItem(title: "Tes Kartu SIM", initialIconAssetName: "simImage", initialResult: .success),
+      makeFixtureItem(title: "Tester", initialResult: .success),
+      makeFixtureItem(title: "CPU", initialResult: .success),
+      makeFixtureItem(title: "Hard Disk", initialResult: .success),
+      makeFixtureItem(title: "Kondisi Baterai", initialResult: .success),
+      makeFixtureItem(title: "Tes Jailbreak", initialResult: .success),
+      makeFixtureItem(title: "Tes Biometric 1", initialResult: .success),
+      makeFixtureItem(title: "Tombol Silent", initialResult: .failed),
+      makeFixtureItem(title: "Tombol Volume", initialResult: .success),
+      makeFixtureItem(title: "Tombol On/Off", initialResult: .success),
+      makeFixtureItem(title: "Tes Kamera", initialResult: .success),
+      makeFixtureItem(title: "Tes Layar Sentuh", initialResult: .success),
+      makeFixtureItem(title: "Tes Kartu SIM", initialResult: .success),
     ]
   }
 
   private func makeFixtureItem(
     title: String,
-    initialIconAssetName: String? = nil,
     initialResult: BetaTestCardState,
     retryResult: BetaTestCardState = .success,
     simulatedDuration: TimeInterval = 0.01,
   ) -> BetaTestItem {
     BetaTestItem(
       title: title,
-      initialIconAssetName: initialIconAssetName,
       state: .initial,
       executionHandler: { phase, continueExecutionWithState in
         let state: BetaTestCardState =

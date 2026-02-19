@@ -7,10 +7,10 @@ enum BetaTestModule {
     let items = configuration.items.map { source in
       BetaTestItem(
         title: source.title,
-        initialIconAssetName: source.initialIconAssetName,
-        failedIconAssetName: source.failedIconAssetName,
-        successIconAssetName: source.successIconAssetName,
-        statusAssetName: source.statusAssetName,
+        initialIconImage: source.initialIconImage,
+        failedIconImage: source.failedIconImage,
+        successIconImage: source.successIconImage,
+        statusImage: source.statusImage,
         state: .initial,
         retryButtonTitle: source.retryButtonTitle,
         executionHandler: source.executionHandler,

@@ -1,29 +1,29 @@
-import Foundation
+import UIKit
 
 enum BetaTestModuleConfiguration {
   struct Item {
     var title: String
-    var initialIconAssetName: String?
-    var failedIconAssetName: String?
-    var successIconAssetName: String?
-    var statusAssetName: String?
+    var initialIconImage: UIImage?
+    var failedIconImage: UIImage?
+    var successIconImage: UIImage?
+    var statusImage: UIImage?
     var retryButtonTitle: String
     var executionHandler: BetaTestItem.ExecutionHandler
 
     init(
       title: String,
-      initialIconAssetName: String? = nil,
-      failedIconAssetName: String? = nil,
-      successIconAssetName: String? = nil,
-      statusAssetName: String? = "successImage",
+      initialIconImage: UIImage? = nil,
+      failedIconImage: UIImage? = nil,
+      successIconImage: UIImage? = nil,
+      statusImage: UIImage? = nil,
       retryButtonTitle: String = "Ulangi",
       executionHandler: @escaping BetaTestItem.ExecutionHandler,
     ) {
       self.title = title
-      self.initialIconAssetName = initialIconAssetName
-      self.failedIconAssetName = failedIconAssetName
-      self.successIconAssetName = successIconAssetName
-      self.statusAssetName = statusAssetName
+      self.initialIconImage = initialIconImage
+      self.failedIconImage = failedIconImage
+      self.successIconImage = successIconImage
+      self.statusImage = statusImage
       self.retryButtonTitle = retryButtonTitle
       self.executionHandler = executionHandler
     }
