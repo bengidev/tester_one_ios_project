@@ -26,7 +26,7 @@
 
 ### Typical rollout flow
 1. Product/QA define item list and expected pass/fail behavior.
-2. Design provides icon assets for `initial`, `failed`, and `success` states.
+2. Design provides icon resources for `initial`, `failed`, and `success` states (assets or any other image source).
 3. Engineering maps each item to a real execution handler.
 4. QA validates first-run + retry path and confirms visual states.
 
@@ -48,10 +48,10 @@ let vc = BetaTestModule.makeViewController(
     items: [
       .init(
         title: "CPU",
-        initialIconAssetName: "fingerInitialImage",
-        failedIconAssetName: "fingerFailedImage",
-        successIconAssetName: "fingerSuccessImage",
-        statusAssetName: "successImage",
+        initialIconImage: UIImage(named: "fingerInitialImage"),
+        failedIconImage: UIImage(named: "fingerFailedImage"),
+        successIconImage: UIImage(named: "fingerSuccessImage"),
+        statusImage: UIImage(named: "successImage"),
         executionHandler: { phase, complete in
           let result: BetaTestCardState
           switch phase {
@@ -94,28 +94,28 @@ let vc = BetaTestModule.makeViewController(
 
 ## Item Configuration Contract
 - `title` (required): card title text.
-- `initialIconAssetName` (optional): icon shown in `.initial` and `.loading`.
-- `failedIconAssetName` (optional): icon shown in `.failed`.
-- `successIconAssetName` (optional): icon shown in `.success`.
-- `statusAssetName` (optional): trailing status image used for success/failed status badge.
+- `initialIconImage` (optional): icon shown in `.initial` and `.loading`.
+- `failedIconImage` (optional): icon shown in `.failed`.
+- `successIconImage` (optional): icon shown in `.success`.
+- `statusImage` (optional): trailing status image used for success/failed status badge.
 - `retryButtonTitle` (optional): retry badge title, defaults to `Ulangi`.
 - `executionHandler` (required): async closure returning `BetaTestCardState` exactly once.
 
 ## Icon Rendering Rules
 - Icon state precedence is explicit per card state:
-  - `.initial`/`.loading`: `initialIconAssetName`, then `failedIconAssetName`, then `successIconAssetName`.
-  - `.failed`: `failedIconAssetName`, then `initialIconAssetName`, then `successIconAssetName`.
-  - `.success`: `successIconAssetName`, then `initialIconAssetName`, then `failedIconAssetName`.
-- If all configured icon assets are missing, module fallback asset is used.
+  - `.initial`/`.loading`: `initialIconImage`, then `failedIconImage`, then `successIconImage`.
+  - `.failed`: `failedIconImage`, then `initialIconImage`, then `successIconImage`.
+  - `.success`: `successIconImage`, then `initialIconImage`, then `failedIconImage`.
+- If configured images are missing or unusable, module fallback image is used.
 - In failed state, retry badge and status badge do not overlap: when retry badge is visible, trailing status image is hidden.
 
 ## Host boundary
 - Environment-driven automation (for screenshots/state capture) stays in host app code (`AppDelegate`), not inside BetaTest internals.
 - Host apps override labels/titles through `BetaTestModuleConfiguration.Screen` and `BetaTestModuleConfiguration.Item`.
 - Host apps provide per-item execution behavior with `BetaTestModuleConfiguration.Item.executionHandler`.
-- Host apps can customize the status badge image per item through `statusAssetName`.
+- Host apps can customize the status badge image per item through `statusImage`.
 - Item cards always start in `.initial` UI state and transition based on execution results provided by host handlers.
-- Host apps can provide different icon assets for `initial`, `failed`, and `success` states per item.
+- Host apps can provide different icon images for `initial`, `failed`, and `success` states per item (for example: `UIImage(named:)`, downloaded images, or generated images).
 
 ## Production implantation strategy
 1. Keep `BetaTestModuleConfiguration.Item` as host-facing DTO.

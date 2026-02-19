@@ -234,6 +234,28 @@ Final result in one sentence:
 - Better production readiness for teams replacing placeholder assets with branded resources.
 - Reduced confusion during module onboarding and integration.
 
+### 4.6 Move Image Contract to UIImage-Only + Runtime Fallback Guard (2026-02-19)
+
+**Problem:**
+- Asset-name string inputs still forced host apps to depend on bundled asset keys.
+- Integrators needed one consistent API that works for asset images and non-asset image sources.
+- Missing/unusable `UIImage` inputs could still lead to inconsistent visuals without explicit fallback validation.
+
+**What changed:**
+- Replaced asset-name based public item fields with UIImage-based fields:
+  - `initialIconImage`
+  - `failedIconImage`
+  - `successIconImage`
+  - `statusImage`
+- Updated module configuration mapping and host integration sample to the UIImage-only contract.
+- Updated cell rendering to validate configured images and use module fallback image when configured images are missing or unusable.
+- Updated module docs to reflect UIImage-only usage and state precedence rules.
+
+**Impact:**
+- Host integrators can pass images from any source with one API surface (`UIImage(named:)`, downloaded files, generated images, etc.).
+- Module behavior is more robust in production when configured images are absent/invalid.
+- API documentation now matches implementation behavior and integration examples.
+
 ## 5) Verification Record
 
 - Local verification command: `./run-tests.sh`
